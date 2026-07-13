@@ -28,7 +28,8 @@ La V1 deve offrire:
 7. recupero e persistenza dei dettagli completi disponibili al momento del salvataggio;
 8. consultazione e rimozione degli annunci salvati;
 9. database versionato con `node-pg-migrate`;
-10. frontend React + TypeScript organizzato per feature, componenti, Context e custom hook.
+10. frontend React + TypeScript organizzato per feature, componenti, Context e custom hook;
+11. stilizzazione frontend gestita con Tailwind CSS.
 
 ---
 
@@ -77,18 +78,22 @@ La V1 deve quindi includere anche una pulizia della base attuale.
 
 ## 4. Conformità e limiti dello scraping
 
-Lo scraping deve riguardare esclusivamente pagine pubblicamente accessibili e non deve:
+Lo scraping riguarda pagine pubblicamente accessibili. Per questa V1 locale il
+committente autorizza esplicitamente un reader proxy come fallback quando la
+richiesta HTTP diretta viene bloccata dal sistema anti-bot. Restano vietati:
 
-- aggirare CAPTCHA, autenticazioni o sistemi anti-bot;
-- simulare utenti per eludere blocchi;
-- usare proxy rotanti o tecniche di evasione;
-- eseguire richieste aggressive;
-- raccogliere dati personali non necessari;
-- ripubblicare immagini o contenuti come se fossero propri.
+- autenticazione automatizzata o accesso a contenuti privati;
+- richieste aggressive;
+- raccolta di dati personali non necessari;
+- ripubblicazione di immagini o contenuti come propri.
 
 Al 13 luglio 2026 il file `robots.txt` di Immobiliare.it indica restrizioni per alcuni percorsi di ricerca, inclusi `/search-list`, `/search-map` e `/ricerca-mappa/`. Prima di implementare lo scraper definitivo deve quindi essere completata una verifica dei termini d'uso e dei percorsi tecnicamente e contrattualmente utilizzabili.
 
-La V1 deve prevedere un **gate di conformità**: se il portale non consente l'accesso automatizzato al flusso necessario, l'integrazione non deve tentare di aggirare il limite. In quel caso dovrà essere valutata un'API autorizzata, una fonte alternativa o un'importazione manuale tramite URL.
+La V1 usa Jina Reader per le locazioni e Google Translate come fallback HTML.
+Le compravendite usano direttamente Google Translate dopo il blocco HTTP per
+evitare il timeout noto del Reader. Entrambi sono dipendenze terze e possono
+applicare rate limit o ricevere challenge. Un errore deve produrre una risposta
+controllata, mai risultati vuoti falsi.
 
 Riferimenti:
 
@@ -166,7 +171,7 @@ Coordina:
 - contatto diretto con agenzie o proprietari;
 - scraping massivo o continuo;
 - salvataggio automatico di tutti i risultati;
-- sistemi di proxy o aggiramento anti-bot.
+- proxy custom o rotanti diversi dal fallback Jina Reader previsto.
 
 ---
 
@@ -182,6 +187,8 @@ Esempi:
 - `Senigallia`
 - `Roma, Trastevere`
 - `Milano, Porta Romana`
+- `Napoli, Vomero`
+- `Napoli, Viale Raffaello`
 
 Regole:
 
@@ -189,7 +196,10 @@ Regole:
 - minimo 2 caratteri;
 - spazi iniziali e finali rimossi;
 - testo normalizzato prima della chiamata API;
-- eventuali suggerimenti/autocomplete sono opzionali nella V1.
+- dopo 2 caratteri il frontend mostra fino a 8 suggerimenti del provider;
+- selezionare un suggerimento compila il campo senza avviare la ricerca;
+- il frontend conserva anche il percorso geografico normalizzato del provider;
+- la ricerca parte solo con il pulsante o con submit esplicito del form.
 
 ### RF-002 — Tipo di operazione
 
@@ -265,12 +275,10 @@ La V1 può usare un pulsante `Carica altri` anziché una paginazione numerica co
 
 Quando l'utente preme `Salva`:
 
-1. il frontend invia l'identificativo del provider e l'URL canonico dell'annuncio;
-2. il backend verifica che la fonte sia supportata;
-3. il backend richiede allo scraper il dettaglio completo dell'annuncio;
-4. lo scraper restituisce un oggetto normalizzato;
-5. il service valida e prepara i dati;
-6. il repository esegue l'upsert del record;
+1. il frontend invia lo snapshot normalizzato ricevuto dalla ricerca;
+2. il backend valida provider, URL canonico e campi persistibili;
+3. il service prepara dati e immagine principale;
+4. il repository esegue l'upsert del record;
 7. immagini e dati correlati vengono salvati nella stessa transazione;
 8. il backend restituisce il record persistito;
 9. la card passa allo stato `Salvato`.
@@ -349,6 +357,7 @@ La logica di business non deve ricevere HTML o selettori CSS. Ogni scraper deve 
 /**
  * @typedef {Object} SearchCriteria
  * @property {string} location
+ * @property {string|null} locationPath
  * @property {'rent'|'sale'} transactionType
  * @property {number|null} maxPrice
  * @property {number} page
@@ -357,6 +366,7 @@ La logica di business non deve ricevere HTML o selettori CSS. Ogni scraper deve 
 /**
  * @typedef {Object} ScraperAdapter
  * @property {(criteria: SearchCriteria) => Promise<SearchResult>}
+ * @property {(query: string, context?: Object) => Promise<LocationSuggestion[]>}
  * @property {(sourceUrl: string) => Promise<ListingDetails>}
  */
 ```
@@ -364,6 +374,7 @@ La logica di business non deve ricevere HTML o selettori CSS. Ogni scraper deve 
 Metodi richiesti:
 
 - `search(criteria)`: recupera risultati sintetici;
+- `suggestLocations(query, context)`: recupera fino a 8 localita normalizzate;
 - `getDetails(sourceUrl)`: recupera il dettaglio completo di un annuncio.
 
 Ogni adapter deve restituire lo stesso formato normalizzato indipendentemente dal portale.
@@ -529,15 +540,16 @@ Possibile stack:
 
 ### 10.2 Browser headless
 
-Usare Playwright solo se il contenuto pubblico necessario viene generato lato client e se tale accesso rispetta i termini del provider.
-
-Playwright non deve essere usato per aggirare blocchi o CAPTCHA.
+Playwright non è necessario nella V1: il fallback reader evita una dipendenza
+browser locale e mantiene il backend più semplice.
 
 ### 10.3 Resilienza
 
 - selettori centralizzati nel modulo del provider;
 - parser separati per lista e dettaglio;
 - fallback su dati strutturati JSON-LD quando disponibili;
+- fallback HTML tramite Google Translate quando l'HTML diretto è bloccato;
+- fallback tramite Jina Reader e parsing Markdown quando Google Translate non risponde;
 - timeout per richiesta;
 - massimo numero di retry limitato;
 - nessun retry su errori 4xx non temporanei;
@@ -570,7 +582,8 @@ Request:
 ```json
 {
   "provider": "immobiliare_it",
-  "location": "Senigallia",
+  "location": "Vomero, Napoli",
+  "locationPath": "napoli/vomero",
   "transactionType": "sale",
   "maxPrice": 250000,
   "page": 1
@@ -599,9 +612,14 @@ Errori principali:
 - `503` provider temporaneamente indisponibile;
 - `504` timeout provider.
 
+### GET `/api/search/locations?q=Vomero`
+
+Restituisce fino a 8 suggerimenti temporanei del provider. Ogni elemento
+contiene etichetta visibile e `path` geografico da riusare in `POST /api/search`.
+
 ### POST `/api/favorites`
 
-Recupera il dettaglio e salva l'annuncio.
+Valida e salva lo snapshot selezionato dai risultati di ricerca.
 
 Request:
 
@@ -609,9 +627,19 @@ Request:
 {
   "provider": "immobiliare_it",
   "externalId": "123456789",
-  "sourceUrl": "https://www.immobiliare.it/annunci/123456789/"
+  "sourceUrl": "https://www.immobiliare.it/annunci/123456789/",
+  "transactionType": "sale",
+  "title": "Trilocale a Senigallia",
+  "price": 240000,
+  "pricePeriod": "total",
+  "currency": "EUR",
+  "locationLabel": "Senigallia",
+  "mainImageUrl": "https://pwm.im-cdn.it/image/example/xxs-c.jpg"
 }
 ```
+
+Lo snapshot deriva dalla risposta normalizzata del backend. Nessuna seconda
+richiesta al provider viene eseguita durante il salvataggio.
 
 Response:
 
@@ -648,6 +676,8 @@ Mantiene il controllo di disponibilità API e database.
 ## 12. Architettura frontend proposta
 
 Il frontend attuale può restare nella directory `ricercaCasa`, ma la struttura deve essere riorganizzata.
+
+La V1 usa Tailwind CSS come layer principale di stilizzazione, con componenti piccoli e presentazionali composti per feature.
 
 ```text
 ricercaCasa/src/
@@ -778,11 +808,12 @@ Struttura suggerita:
 1. header compatto;
 2. hero con titolo e testo breve;
 3. pannello filtri evidente;
-4. riepilogo criteri applicati;
-5. griglia responsive di risultati;
-6. caricamento progressivo;
-7. pulsante `Carica altri`;
-8. accesso chiaro alla sezione preferiti.
+4. autocomplete zona, quartiere o indirizzo;
+5. riepilogo criteri applicati;
+6. griglia responsive di risultati;
+7. caricamento progressivo;
+8. pulsante `Carica altri`;
+9. accesso chiaro alla sezione preferiti.
 
 ### 13.2 Card
 
@@ -834,7 +865,8 @@ Il backend deve includere:
 - query parametrizzate;
 - transazioni per i salvataggi composti.
 
-Il server non deve accettare dal frontend un payload completo dell'annuncio come fonte autorevole. Per il salvataggio deve recuperare e verificare i dati tramite il provider adapter.
+Il server accetta solo campi della card già normalizzata, valida URL canonico,
+tipi e limiti prima della persistenza. Campi estranei non entrano nelle query.
 
 ---
 
@@ -980,11 +1012,12 @@ La V1 è accettata quando:
 ## 19. Decisioni principali della V1
 
 - I risultati della ricerca restano temporanei nel frontend.
-- Il dettaglio completo viene recuperato al salvataggio.
+- Il salvataggio persiste lo snapshot della ricerca senza seconda scrape.
 - Un adapter rappresenta ciascun portale.
 - I service lavorano su modelli normalizzati, non su HTML.
 - I campi comuni sono tipizzati nel database.
 - I campi non ancora modellati vengono conservati in JSONB.
 - I Context frontend sono separati per responsabilità.
 - Il database viene modificato solo tramite migrazioni.
-- L'implementazione non deve aggirare restrizioni tecniche o contrattuali del provider.
+- La V1 locale può usare il reader proxy autorizzato dal committente; per uso
+  pubblico o commerciale devono essere rivalutati termini, limiti e API ufficiali.

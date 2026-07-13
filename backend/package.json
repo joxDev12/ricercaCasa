@@ -4,7 +4,13 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "test": "node --test",
+    "db:create-migration": "node-pg-migrate create -m migrations",
+    "db:migrate": "node-pg-migrate up -m migrations",
+    "db:rollback": "node-pg-migrate down -m migrations",
+    "db:status": "node-pg-migrate status -m migrations"
   },
   "keywords": [],
   "type": "commonjs",
@@ -19,5 +25,9 @@
     "jsonwebtoken": "^9.0.3",
     "nodemon": "^3.1.14",
     "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "cheerio": "^1.2.0",
+    "node-pg-migrate": "^8.0.4"
   }
 }
