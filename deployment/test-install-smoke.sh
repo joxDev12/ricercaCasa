@@ -5,6 +5,8 @@ DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$DEPLOY_DIR/.." && pwd)"
 RELEASE_ENV_PATH="$DEPLOY_DIR/release.env"
 SMOKE_TEST_CONFIRM="${SMOKE_TEST_CONFIRM:-0}"
+SMOKE_REQUIRE_SECRET_UID_MISMATCH="${SMOKE_REQUIRE_SECRET_UID_MISMATCH:-0}"
+SECRETS_DIR="$DEPLOY_DIR/secrets"
 
 compose() {
   env_file="$RELEASE_ENV_PATH"
@@ -99,12 +101,93 @@ wait_service_running() {
   exit 1
 }
 
+wait_service_healthy() {
+  service="$1"
+  attempts="${2:-60}"
+
+  while [ "$attempts" -gt 0 ]; do
+    container_id="$(compose ps -q "$service")"
+
+    if [ -n "$container_id" ]; then
+      status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+
+      if [ "$status" = "healthy" ]; then
+        return 0
+      fi
+    fi
+
+    attempts=$((attempts - 1))
+    sleep 2
+  done
+
+  echo "Servizio non healthy: $service" >&2
+  exit 1
+}
+
 assert_clean_generated_files() {
   if [ -n "$(git -C "$REPO_DIR" status --short -- deployment/secrets deployment/state deployment/release.env)" ]; then
     echo "Artifact deploy visibili in git status" >&2
     git -C "$REPO_DIR" status --short -- deployment/secrets deployment/state deployment/release.env >&2
     exit 1
   fi
+}
+
+prepare_ci_secret_fixture() {
+  mkdir -p "$SECRETS_DIR"
+  printf 'smoke-postgres-password-%s\n' "$$" >"$SECRETS_DIR/postgres_password"
+  printf 'smoke-app-secret-%s\n' "$$" >"$SECRETS_DIR/app_secret"
+  printf 'smoke-setup-token-%s\n' "$$" >"$SECRETS_DIR/setup_token"
+  chmod 600 "$SECRETS_DIR/postgres_password" "$SECRETS_DIR/app_secret" "$SECRETS_DIR/setup_token"
+
+  docker run --rm \
+    -v "$SECRETS_DIR:/secrets" \
+    node:22-bookworm-slim \
+    sh -c 'chown 2001:2001 /secrets/postgres_password /secrets/app_secret /secrets/setup_token && chmod 600 /secrets/postgres_password /secrets/app_secret /secrets/setup_token'
+}
+
+assert_ci_secret_fixture() {
+  for secret_name in postgres_password app_secret setup_token; do
+    secret_path="$SECRETS_DIR/$secret_name"
+    mode="$(stat -c '%a' "$secret_path")"
+    owner_uid="$(stat -c '%u' "$secret_path")"
+
+    if [ "$mode" != "600" ]; then
+      echo "Secret non mode 600: $secret_path $mode" >&2
+      exit 1
+    fi
+
+    if [ "$SMOKE_REQUIRE_SECRET_UID_MISMATCH" = "1" ] && [ "$owner_uid" = "1000" ]; then
+      echo "Secret owner coincide con UID node: $secret_path" >&2
+      exit 1
+    fi
+  done
+}
+
+assert_pid1_non_root() {
+  service="$1"
+  uid="$(compose exec -T -u root "$service" sh -c "awk '/^Uid:/{print \$2}' /proc/1/status")"
+
+  if [ "$uid" = "0" ]; then
+    echo "Processo applicativo root: $service" >&2
+    exit 1
+  fi
+}
+
+assert_bootstrap_loaded_secrets() {
+  compose run --rm --no-deps backend sh -c '
+    test "$(id -u)" != "0" &&
+    test -n "$DB_PASS" &&
+    test -n "$APP_SECRET" &&
+    test -n "$SETUP_TOKEN" &&
+    test -z "${DB_PASS_FILE:-}" &&
+    test -z "${APP_SECRET_FILE:-}" &&
+    test -z "${SETUP_TOKEN_FILE:-}"
+  '
+  compose run --rm --no-deps updater sh -c '
+    test "$(id -u)" != "0" &&
+    test -n "$SETUP_TOKEN" &&
+    test -z "${SETUP_TOKEN_FILE:-}"
+  '
 }
 
 need_cmd docker
@@ -115,20 +198,27 @@ trap print_failure_context ERR
 
 compose down -v --remove-orphans || true
 rm -rf "$DEPLOY_DIR/secrets" "$DEPLOY_DIR/state" "$DEPLOY_DIR/release.env"
+prepare_ci_secret_fixture
 
 "$DEPLOY_DIR/install.sh"
 assert_clean_generated_files
+assert_ci_secret_fixture
 
 load_release_env
 
 wait_service_running backend
 wait_service_running frontend
 wait_service_running updater
+wait_service_healthy backend
+wait_service_healthy updater
 wait_backend_health /health/live
 wait_backend_health /health/ready
 wait_http "http://127.0.0.1:${APP_PORT}/health"
 wait_http "http://127.0.0.1:${UPDATER_PORT}/health"
 wait_http "http://127.0.0.1:${UPDATER_PORT}/updater/setup/status"
+assert_pid1_non_root backend
+assert_pid1_non_root updater
+assert_bootstrap_loaded_secrets
 
 curl -fsS \
   -X POST \
@@ -158,9 +248,11 @@ compose exec -T backend node -e "fetch('http://127.0.0.1:3000/api/settings').the
 
 compose down -v --remove-orphans
 rm -rf "$DEPLOY_DIR/secrets" "$DEPLOY_DIR/state" "$DEPLOY_DIR/release.env"
+prepare_ci_secret_fixture
 
 "$DEPLOY_DIR/install.sh"
 assert_clean_generated_files
+assert_ci_secret_fixture
 load_release_env
 wait_http "http://127.0.0.1:${UPDATER_PORT}/updater/setup/status"
 

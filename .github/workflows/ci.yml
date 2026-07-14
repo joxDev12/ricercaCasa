@@ -80,4 +80,4 @@ jobs:
       - name: Run install smoke test
         run: |
           chmod +x deployment/install.sh deployment/test-install-smoke.sh
-          SMOKE_TEST_CONFIRM=1 ./deployment/test-install-smoke.sh
+          SMOKE_TEST_CONFIRM=1 SMOKE_REQUIRE_SECRET_UID_MISMATCH=1 ./deployment/test-install-smoke.sh
