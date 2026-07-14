@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { PageContainer } from './PageContainer'
-import { SearchIcon, HeartIcon } from '../ui/Icons'
+import { SearchIcon, HeartIcon, SettingsIcon } from '../ui/Icons'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
@@ -26,6 +26,10 @@ export function Header() {
             <NavLink className={linkClass} to="/favorites">
               <HeartIcon className="h-4 w-4" />
               Preferiti
+            </NavLink>
+            <NavLink className={linkClass} to="/settings">
+              <SettingsIcon className="h-4 w-4" />
+              Impostazioni
             </NavLink>
           </nav>
         </div>

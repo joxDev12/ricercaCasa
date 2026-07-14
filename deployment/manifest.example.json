@@ -1,0 +1,27 @@
+{
+  "platformVersion": "3.0.0",
+  "channel": "stable",
+  "minimumUpdaterVersion": "1.0.0",
+  "composeSchemaVersion": 1,
+  "images": {
+    "frontend": {
+      "name": "ricercacasa-frontend",
+      "tag": "3.0.0"
+    },
+    "backend": {
+      "name": "ricercacasa-backend",
+      "tag": "3.0.0"
+    },
+    "updater": {
+      "name": "ricercacasa-updater",
+      "tag": "1.0.0"
+    }
+  },
+  "database": {
+    "migrationRequired": true,
+    "minimumPostgresMajor": 17,
+    "maximumPostgresMajor": 17
+  },
+  "configurationTasks": [],
+  "releaseNotesUrl": "https://example.invalid/release-notes"
+}

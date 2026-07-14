@@ -8,26 +8,24 @@
     "start": "node server.js",
     "test": "node --test",
     "db:create-migration": "node-pg-migrate create -m migrations",
-    "db:migrate": "node-pg-migrate up -m migrations",
-    "db:rollback": "node-pg-migrate down -m migrations",
-    "db:status": "node-pg-migrate status -m migrations"
+    "db:migrate": "node ./scripts/run-migrations.js up",
+    "db:rollback": "node ./scripts/run-migrations.js down",
+    "db:status": "node ./scripts/run-migrations.js status"
   },
   "keywords": [],
   "type": "commonjs",
   "dependencies": {
-    "bcrypt": "^6.0.0",
+    "cheerio": "^1.2.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "express-validator": "^7.3.2",
     "helmet": "^8.3.0",
-    "jsonwebtoken": "^9.0.3",
-    "nodemon": "^3.1.14",
+    "node-pg-migrate": "^8.0.4",
     "pg": "^8.22.0"
   },
   "devDependencies": {
-    "cheerio": "^1.2.0",
-    "node-pg-migrate": "^8.0.4"
+    "nodemon": "^3.1.14"
   }
 }

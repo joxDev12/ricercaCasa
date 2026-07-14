@@ -238,7 +238,124 @@ L'updater presenta il wizard, mentre il backend:
 I task possono essere:
 
 - bloccanti, se la piattaforma non può funzionare correttamente senza configurazione;
-- non bloccanti, se soltanto la nuova funzione deve restare disabilitata.
+- non bloccanti, se la feature può restare spenta finché non viene configurata.
+
+---
+
+## Setup locale V3 da Docker
+
+Stato attuale repository:
+
+- backend con health `live` e `ready`;
+- tabelle V3 per installazione, preferenze, feature e storico update;
+- pagina `Impostazioni` nel frontend;
+- updater locale minimale con wizard iniziale;
+- `Dockerfile` per backend, frontend, updater;
+- `compose.yaml` e `install.sh` per prova locale;
+- workflow CI con test, build, migrazioni e build immagini.
+
+### Prerequisiti
+
+- Docker Engine oppure Docker Desktop;
+- Docker Compose v2.
+
+### Avvio stack locale
+
+Dal repository:
+
+```bash
+chmod +x deployment/install.sh
+./deployment/install.sh
+```
+
+URL locali:
+
+- dashboard: `http://127.0.0.1:8080/`
+- wizard/updater: `http://127.0.0.1:8081/`
+
+L'installer locale:
+
+- genera `deployment/secrets/postgres_password`;
+- genera `deployment/secrets/app_secret`;
+- genera `deployment/secrets/setup_token`;
+- crea `deployment/release.env` se assente;
+- builda immagini locali e avvia stack.
+
+### Wizard iniziale
+
+Wizard vive in updater e inoltra richieste a backend interno con token bootstrap.
+
+Campi attuali:
+
+- nome visualizzato;
+- email contatto;
+- lingua;
+- fuso orario;
+- consenso uso locale scraper;
+- conferma finale setup.
+
+Dopo completamento:
+
+- backend marca `app_installation.setup_status = completed`;
+- API bootstrap non completano più setup seconda volta;
+- dashboard `Impostazioni` mostra stato installazione e versioni.
+
+### Simulare disponibilita update
+
+Updater minimale legge manifest locale da:
+
+```text
+deployment/state/manifests/latest.json
+```
+
+Per prova rapida:
+
+```bash
+mkdir -p deployment/state/manifests
+cp deployment/manifest.example.json deployment/state/manifests/latest.json
+```
+
+Endpoint utile:
+
+```text
+GET http://127.0.0.1:8081/updater/releases/latest
+```
+
+Questa base serve per prossima fase: provare esperienza utente di update e iterare wizard/update flow dopo primo deploy.
+
+### Comandi utili
+
+```bash
+docker compose -f deployment/compose.yaml --env-file deployment/release.env ps
+docker compose -f deployment/compose.yaml --env-file deployment/release.env logs -f updater
+docker compose -f deployment/compose.yaml --env-file deployment/release.env logs -f backend
+docker compose -f deployment/compose.yaml --env-file deployment/release.env down
+```
+
+### Stato updater attuale
+
+Installazione pubblica senza repository (asset GitHub Release):
+
+```bash
+curl -fsSL https://github.com/joxDev12/ricercaCasa/releases/download/v3.0.0/install.sh | bash
+```
+
+Bootstrap crea `~/.ricercacasa`, genera secret `600` e avvia soltanto updater. Updater scarica immagini, esegue migrazioni e avvia stack applicativo.
+
+Updater presente oggi copre:
+
+- pagina wizard iniziale;
+- proxy bootstrap verso backend con `x-setup-token`;
+- endpoint stato locale;
+- lettura manifest locale per simulazioni update.
+
+Non copre ancora:
+
+- pull digest remoto;
+- backup automatico PostgreSQL;
+- state machine completa update;
+- self-update updater;
+- rollback coordinato.
 
 ---
 

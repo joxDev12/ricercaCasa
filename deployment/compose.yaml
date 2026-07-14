@@ -1,0 +1,152 @@
+name: ricercacasa
+
+services:
+  database:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ricercacasa
+      POSTGRES_USER: ricercacasa
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ricercacasa -d ricercacasa"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  migrate:
+    build:
+      context: ../backend
+    image: ${BACKEND_IMAGE:-ricercacasa-backend}:${PLATFORM_VERSION:-3.0.0}
+    environment:
+      NODE_ENV: production
+      PLATFORM_VERSION: ${PLATFORM_VERSION:-3.0.0}
+      UPDATER_VERSION: ${UPDATER_VERSION:-1.0.0}
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: ricercacasa
+      DB_USER: ricercacasa
+      DB_PASS_FILE: /run/secrets/postgres_password
+      APP_SECRET_FILE: /run/secrets/app_secret
+      SETUP_TOKEN_FILE: /run/secrets/setup_token
+    command: ["npm", "run", "db:migrate"]
+    secrets:
+      - postgres_password
+      - app_secret
+      - setup_token
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+
+  backend:
+    build:
+      context: ../backend
+    image: ${BACKEND_IMAGE:-ricercacasa-backend}:${PLATFORM_VERSION:-3.0.0}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      PLATFORM_VERSION: ${PLATFORM_VERSION:-3.0.0}
+      UPDATER_VERSION: ${UPDATER_VERSION:-1.0.0}
+      FRONTEND_ORIGIN: http://127.0.0.1:${APP_PORT:-8080}
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: ricercacasa
+      DB_USER: ricercacasa
+      DB_PASS_FILE: /run/secrets/postgres_password
+      APP_SECRET_FILE: /run/secrets/app_secret
+      SETUP_TOKEN_FILE: /run/secrets/setup_token
+      ALLOW_PROVIDER_SCRAPING: "true"
+    secrets:
+      - postgres_password
+      - app_secret
+      - setup_token
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "node", "./scripts/healthcheck.js", "ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 30s
+
+  frontend:
+    build:
+      context: ../ricercaCasa
+    image: ${FRONTEND_IMAGE:-ricercacasa-frontend}:${PLATFORM_VERSION:-3.0.0}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  updater:
+    build:
+      context: ../updater
+    image: ${UPDATER_IMAGE:-ricercacasa-updater}:${UPDATER_VERSION:-1.0.0}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${UPDATER_PORT:-8081}:8081"
+    environment:
+      PORT: 8081
+      UPDATER_VERSION: ${UPDATER_VERSION:-1.0.0}
+      PLATFORM_VERSION: ${PLATFORM_VERSION:-3.0.0}
+      APP_PORT: ${APP_PORT:-8080}
+      APP_PUBLIC_ORIGIN: http://127.0.0.1:${APP_PORT:-8080}
+      BACKEND_INTERNAL_URL: http://backend:3000
+      RELEASE_MANIFEST_PATH: /state/manifests/latest.json
+      SETUP_TOKEN_FILE: /run/secrets/setup_token
+    volumes:
+      - updater_data:/state
+      - backups:/backups
+    secrets:
+      - setup_token
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "node", "./scripts/healthcheck.js"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  updater_data:
+  backups:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  app_secret:
+    file: ./secrets/app_secret
+  setup_token:
+    file: ./secrets/setup_token
