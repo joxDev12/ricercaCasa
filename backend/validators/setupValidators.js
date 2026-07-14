@@ -18,6 +18,10 @@ const profileValidators = [
     .trim()
     .isLength({ min: 1, max: 100 })
     .withMessage("timezone non valida"),
+];
+
+const initialSetupValidators = [
+  ...profileValidators,
   body("scrapingConsent")
     .isBoolean({ strict: true })
     .custom((value) => value === true)
@@ -28,4 +32,4 @@ const profileValidators = [
     .withMessage("confirmSetup richiesto"),
 ];
 
-module.exports = { profileValidators };
+module.exports = { initialSetupValidators, profileValidators };
