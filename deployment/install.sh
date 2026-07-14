@@ -29,6 +29,19 @@ verify_private_file() {
   fi
 }
 
+read_release_value() {
+  key="$1"
+  default_value="$2"
+  value="$(grep -E "^${key}=" "$RELEASE_ENV_PATH" 2>/dev/null | tail -n 1 | cut -d '=' -f 2- || true)"
+
+  if [ -n "$value" ]; then
+    printf '%s\n' "$value"
+    return
+  fi
+
+  printf '%s\n' "$default_value"
+}
+
 random_secret() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
@@ -39,6 +52,10 @@ random_secret() {
 }
 
 need_cmd docker
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker daemon non raggiungibile" >&2
+  exit 1
+fi
 
 mkdir -p "$SECRETS_DIR" "$MANIFEST_DIR"
 
@@ -82,5 +99,8 @@ docker compose \
   -f "$DEPLOY_DIR/compose.yaml" \
   up -d backend frontend updater
 
-echo "Wizard: http://127.0.0.1:8081/"
-echo "Dashboard: http://127.0.0.1:8080/"
+APP_PORT_VALUE="$(read_release_value APP_PORT 8080)"
+UPDATER_PORT_VALUE="$(read_release_value UPDATER_PORT 8081)"
+
+echo "Wizard: http://127.0.0.1:${UPDATER_PORT_VALUE}/"
+echo "Dashboard: http://127.0.0.1:${APP_PORT_VALUE}/"

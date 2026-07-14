@@ -77,9 +77,7 @@ jobs:
     needs: [backend, frontend, updater]
     steps:
       - uses: actions/checkout@v4
-      - name: Build backend image
-        run: docker build -t ricercacasa-backend:test ./backend
-      - name: Build frontend image
-        run: docker build -t ricercacasa-frontend:test ./ricercaCasa
-      - name: Build updater image
-        run: docker build -t ricercacasa-updater:test ./updater
+      - name: Run install smoke test
+        run: |
+          chmod +x deployment/install.sh deployment/test-install-smoke.sh
+          ./deployment/test-install-smoke.sh
