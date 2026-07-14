@@ -51,5 +51,6 @@ if [ ! -f "$HOME_DIR/release.env" ]; then
 fi
 
 export RICERCACASA_HOME="$HOME_DIR"
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
 docker compose --env-file "$HOME_DIR/release.env" -f "$BOOTSTRAP_COMPOSE" up -d
 echo "Updater: http://127.0.0.1:${UPDATER_PORT:-8081}"

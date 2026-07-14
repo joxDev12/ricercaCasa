@@ -97,6 +97,8 @@ services:
       COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-ricercacasa}
       BACKEND_PORT: ${BACKEND_PORT:-3000}
       SETUP_TOKEN_FILE: /run/secrets/setup_token
+      HOST_UID: ${HOST_UID:-1000}
+      HOST_GID: ${HOST_GID:-1000}
     secrets: [setup_token]
     volumes:
       - updater_data:/state

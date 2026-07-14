@@ -34,6 +34,10 @@ on_error() {
   echo "Smoke updater-first fallito (exit $code)" >&2
   docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" ps >&2 || true
   docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" logs --no-color migrate backend frontend updater >&2 || true
+  docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" logs --no-color updater >&2 || true
+  for path in "$home_dir" "$home_dir/state" "$home_dir/secrets" "$home_dir/backups"; do
+    stat -c '%n uid=%u gid=%g mode=%a' "$path" >&2 || true
+  done
   exit "$code"
 }
 trap on_error ERR
@@ -64,6 +68,7 @@ printf '%s\n' "{\"schemaVersion\":1,\"platformVersion\":\"3.0.0\",\"updaterVersi
 chmod 600 "$home_dir/manifest.json"
 
 export RICERCACASA_HOME="$home_dir" ALLOWED_IMAGE_NAMESPACE="$registry" COMPOSE_PROJECT_NAME="$project" BACKEND_PORT="$backend_port"
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
 docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" up -d
 echo "[pre-install] verifica servizi applicativi assenti"
 if docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" ps --status running --services | grep -Eq '^(database|migrate|backend|frontend)$'; then
@@ -75,14 +80,15 @@ if ! wait_http http://127.0.0.1:8081/health; then
   echo "FAIL pre-install: updater health" >&2
   exit 1
 fi
-echo "[pre-install] docker info come node"
-if ! docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user node updater docker info >/dev/null; then
-  echo "FAIL pre-install: docker info come node" >&2
+echo "[pre-install] docker info come utente runtime"
+runtime_user="$(docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user root updater getent passwd "$HOST_UID" | cut -d: -f1 | tr -d '\r')"
+if [[ -z "$runtime_user" ]] || ! docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user "$runtime_user" updater docker info >/dev/null; then
+  echo "FAIL pre-install: docker info come utente runtime" >&2
   exit 1
 fi
-echo "[pre-install] docker compose version come node"
-if ! docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user node updater docker compose version >/dev/null; then
-  echo "FAIL pre-install: docker compose version come node" >&2
+echo "[pre-install] docker compose version come utente runtime"
+if ! docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user "$runtime_user" updater docker compose version >/dev/null; then
+  echo "FAIL pre-install: docker compose version come utente runtime" >&2
   exit 1
 fi
 echo "[pre-install] UID numerico PID 1"
@@ -91,13 +97,20 @@ pid1_uid="$(docker compose -p "$project" --env-file "$home_dir/release.env" -f "
   exit 1
 }
 echo "UID PID 1: ${pid1_uid}"
-if [[ "$pid1_uid" != 1000 ]]; then
-  echo "FAIL pre-install: UID PID 1 atteso 1000, trovato ${pid1_uid}" >&2
+pid1_gid="$(docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user root updater awk '/^Gid:/{print $2}' /proc/1/status | tr -d '\r')" || {
+  echo "FAIL pre-install: lettura GID PID 1" >&2
+  exit 1
+}
+if [[ "$pid1_uid" = 0 || "$pid1_uid" != "$HOST_UID" || "$pid1_gid" != "$HOST_GID" ]]; then
+  echo "FAIL pre-install: PID1 uid/gid ${pid1_uid}/${pid1_gid}, atteso ${HOST_UID}/${HOST_GID}" >&2
   exit 1
 fi
 echo "[pre-install] POST /updater/install/start"
-if ! curl -fsS -X POST http://127.0.0.1:8081/updater/install/start >/dev/null; then
-  echo "FAIL pre-install: POST /updater/install/start" >&2
+post_body="$home_dir/post-install.json"
+post_status="$(curl -sS -o "$post_body" -w '%{http_code}' -X POST http://127.0.0.1:8081/updater/install/start || true)"
+if [[ "$post_status" != 202 ]]; then
+  echo "FAIL pre-install: POST /updater/install/start HTTP ${post_status}" >&2
+  cat "$post_body" >&2
   exit 1
 fi
 
@@ -124,6 +137,13 @@ for _ in {1..60}; do
 done
 grep -q '"ready":true' <<<"$setup_status"
 test "$(stat -c '%a' "$home_dir/secrets/postgres_password")" = 600
+for secret in postgres_password app_secret setup_token; do
+  secret_stat="$(stat -c '%u %g %a' "$home_dir/secrets/$secret")"
+  [[ "$secret_stat" == "$HOST_UID $HOST_GID 600" ]] || {
+    echo "Secret $secret owner/mode non valido: $secret_stat" >&2
+    exit 1
+  }
+done
 test -s "$home_dir/state/installation.json"
 job_id="$(printf '%s' "$status" | sed -n 's/.*"jobId":"\([^"]*\)".*/\1/p')"
 test -s "$home_dir/state/logs/${job_id}.log"
