@@ -4,6 +4,7 @@ set -euo pipefail
 DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$DEPLOY_DIR/.." && pwd)"
 RELEASE_ENV_PATH="$DEPLOY_DIR/release.env"
+SMOKE_TEST_CONFIRM="${SMOKE_TEST_CONFIRM:-0}"
 
 compose() {
   env_file="$RELEASE_ENV_PATH"
@@ -15,11 +16,36 @@ compose() {
   docker compose --env-file "$env_file" -f "$DEPLOY_DIR/compose.yaml" "$@"
 }
 
+load_release_env() {
+  set -a
+  . "$RELEASE_ENV_PATH"
+  set +a
+}
+
+print_failure_context() {
+  echo >&2
+  echo "========== SMOKE TEST FAILURE CONTEXT ==========" >&2
+  compose ps >&2 || true
+  compose logs --no-color migrate >&2 || true
+  compose logs --no-color backend >&2 || true
+  compose logs --no-color frontend >&2 || true
+  compose logs --no-color updater >&2 || true
+}
+
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "Comando richiesto mancante: $1" >&2
     exit 1
   }
+}
+
+require_confirmation() {
+  echo "ATTENZIONE: questo smoke test elimina volumi Docker, database, secret e configurazioni locali." >&2
+  echo "Per continuare usa: SMOKE_TEST_CONFIRM=1 ./deployment/test-install-smoke.sh" >&2
+
+  if [ "$SMOKE_TEST_CONFIRM" != "1" ]; then
+    exit 1
+  fi
 }
 
 wait_http() {
@@ -84,6 +110,9 @@ assert_clean_generated_files() {
 need_cmd docker
 need_cmd curl
 need_cmd rg
+need_cmd node
+require_confirmation
+trap print_failure_context ERR
 
 compose down -v --remove-orphans || true
 rm -rf "$DEPLOY_DIR/secrets" "$DEPLOY_DIR/state" "$DEPLOY_DIR/release.env"
@@ -91,9 +120,7 @@ rm -rf "$DEPLOY_DIR/secrets" "$DEPLOY_DIR/state" "$DEPLOY_DIR/release.env"
 "$DEPLOY_DIR/install.sh"
 assert_clean_generated_files
 
-set -a
-. "$RELEASE_ENV_PATH"
-set +a
+load_release_env
 
 wait_service_running backend
 wait_service_running frontend
@@ -135,6 +162,7 @@ rm -rf "$DEPLOY_DIR/secrets" "$DEPLOY_DIR/state" "$DEPLOY_DIR/release.env"
 
 "$DEPLOY_DIR/install.sh"
 assert_clean_generated_files
+load_release_env
 wait_http "http://127.0.0.1:${UPDATER_PORT}/updater/setup/status"
 
 setup_phase="$(curl -fsS "http://127.0.0.1:${UPDATER_PORT}/updater/setup/status" | node -e "let raw=''; process.stdin.on('data', (chunk) => raw += chunk); process.stdin.on('end', () => { const payload = JSON.parse(raw); process.stdout.write(payload.data.phase || ''); });")"

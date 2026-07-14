@@ -97,7 +97,7 @@ echo "Avvio stack..."
 docker compose \
   --env-file "$RELEASE_ENV_PATH" \
   -f "$DEPLOY_DIR/compose.yaml" \
-  up -d backend frontend updater
+  up -d --build backend frontend updater
 
 APP_PORT_VALUE="$(read_release_value APP_PORT 8080)"
 UPDATER_PORT_VALUE="$(read_release_value UPDATER_PORT 8081)"
