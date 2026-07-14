@@ -65,16 +65,41 @@ chmod 600 "$home_dir/manifest.json"
 
 export RICERCACASA_HOME="$home_dir" ALLOWED_IMAGE_NAMESPACE="$registry" COMPOSE_PROJECT_NAME="$project" BACKEND_PORT="$backend_port"
 docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" up -d
+echo "[pre-install] verifica servizi applicativi assenti"
 if docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" ps --status running --services | grep -Eq '^(database|migrate|backend|frontend)$'; then
-  echo "Servizio applicativo attivo prima di install/start" >&2
+  echo "FAIL pre-install: servizio applicativo attivo prima di install/start" >&2
   exit 1
 fi
-wait_http http://127.0.0.1:8081/health
-docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user node updater docker info >/dev/null
-docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user node updater docker compose version >/dev/null
-updater_container="$(docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" ps -q updater)"
-test "$(docker top "$updater_container" -eo pid,user,args | awk 'NR == 2 {print $2}')" = 1000
-curl -fsS -X POST http://127.0.0.1:8081/updater/install/start >/dev/null
+echo "[pre-install] updater health"
+if ! wait_http http://127.0.0.1:8081/health; then
+  echo "FAIL pre-install: updater health" >&2
+  exit 1
+fi
+echo "[pre-install] docker info come node"
+if ! docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user node updater docker info >/dev/null; then
+  echo "FAIL pre-install: docker info come node" >&2
+  exit 1
+fi
+echo "[pre-install] docker compose version come node"
+if ! docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user node updater docker compose version >/dev/null; then
+  echo "FAIL pre-install: docker compose version come node" >&2
+  exit 1
+fi
+echo "[pre-install] UID numerico PID 1"
+pid1_uid="$(docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user root updater awk '/^Uid:/{print $2}' /proc/1/status | tr -d '\r')" || {
+  echo "FAIL pre-install: lettura UID PID 1" >&2
+  exit 1
+}
+echo "UID PID 1: ${pid1_uid}"
+if [[ "$pid1_uid" != 1000 ]]; then
+  echo "FAIL pre-install: UID PID 1 atteso 1000, trovato ${pid1_uid}" >&2
+  exit 1
+fi
+echo "[pre-install] POST /updater/install/start"
+if ! curl -fsS -X POST http://127.0.0.1:8081/updater/install/start >/dev/null; then
+  echo "FAIL pre-install: POST /updater/install/start" >&2
+  exit 1
+fi
 
 status=""
 for _ in {1..180}; do
