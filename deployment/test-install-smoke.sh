@@ -110,7 +110,7 @@ assert_clean_generated_files() {
 need_cmd docker
 need_cmd curl
 need_cmd rg
-need_cmd node
+need_cmd python3
 require_confirmation
 trap print_failure_context ERR
 
@@ -165,7 +165,7 @@ assert_clean_generated_files
 load_release_env
 wait_http "http://127.0.0.1:${UPDATER_PORT}/updater/setup/status"
 
-setup_phase="$(curl -fsS "http://127.0.0.1:${UPDATER_PORT}/updater/setup/status" | node -e "let raw=''; process.stdin.on('data', (chunk) => raw += chunk); process.stdin.on('end', () => { const payload = JSON.parse(raw); process.stdout.write(payload.data.phase || ''); });")"
+setup_phase="$(curl -fsS "http://127.0.0.1:${UPDATER_PORT}/updater/setup/status" | python3 -c 'import json,sys; payload=json.load(sys.stdin); print((payload.get("data") or {}).get("phase",""), end="")')"
 
 if [ "$setup_phase" != "ready" ]; then
   echo "Installazione pulita dopo down -v non pronta: $setup_phase" >&2
