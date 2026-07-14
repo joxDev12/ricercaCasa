@@ -119,11 +119,18 @@
         color: #b91c1c;
       }
       .footer-link {
-        display: inline-flex;
+        display: none;
         margin-top: 16px;
         color: var(--accent);
         font-weight: 700;
         text-decoration: none;
+        align-items: center;
+        justify-content: center;
+        min-height: 52px;
+        padding: 0 18px;
+        border-radius: 18px;
+        background: var(--accent);
+        color: white;
       }
       @media (max-width: 900px) {
         .grid { grid-template-columns: 1fr; }
@@ -181,7 +188,7 @@
             <button id="submit-button" type="submit">Completa setup</button>
           </form>
           <div id="message" class="message"></div>
-          <a class="footer-link" href="http://127.0.0.1:8080/" target="_blank" rel="noreferrer">
+          <a id="open-app-link" class="footer-link" href="#" target="_blank" rel="noreferrer">
             Apri dashboard
           </a>
         </section>
@@ -199,6 +206,10 @@
       const form = document.getElementById('setup-form')
       const submitButton = document.getElementById('submit-button')
       const timezoneInput = document.getElementById('timezone')
+      const openAppLink = document.getElementById('open-app-link')
+      const formControls = Array.from(form.querySelectorAll('input, select, button'))
+
+      let lastAppUrl = ''
 
       timezoneInput.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome'
 
@@ -206,6 +217,17 @@
         message.textContent = text
         message.className = `message ${type === 'error' ? 'error' : ''}`
         message.style.display = 'block'
+      }
+
+      function setFormEnabled(enabled) {
+        formControls.forEach((control) => {
+          if (control === submitButton) {
+            control.disabled = !enabled
+            return
+          }
+
+          control.disabled = !enabled
+        })
       }
 
       function renderStatus(items) {
@@ -224,6 +246,14 @@
         })
       }
 
+      function showOpenApp(url) {
+        if (!url) return
+        lastAppUrl = url
+        openAppLink.href = url
+        openAppLink.textContent = 'Apri RicercaCasa'
+        openAppLink.style.display = 'inline-flex'
+      }
+
       async function loadStatus() {
         const [updaterStatusResponse, setupStatusResponse] = await Promise.all([
           fetch('/updater/status'),
@@ -233,44 +263,63 @@
         const updaterStatus = await updaterStatusResponse.json()
         const setupStatus = await setupStatusResponse.json()
         const installation = setupStatus.data?.installation
+        const phase = setupStatus.data?.phase || 'preparing'
         const completed = setupStatus.data?.completed === true
+        const appUrl = setupStatus.data?.appUrl || updaterStatus.data?.appUrl || ''
 
         renderStatus([
           {
             label: 'Updater',
-            description: 'Versione container wizard/update.',
+            description: 'Versione wizard locale.',
             value: updaterStatus.data.updaterVersion,
             ok: true,
           },
           {
             label: 'Piattaforma',
-            description: 'Versione target frontend/backend.',
+            description: 'Versione frontend/backend.',
             value: updaterStatus.data.platformVersion,
             ok: true,
           },
           {
             label: 'Setup token',
-            description: 'Bootstrap disponibile per setup iniziale.',
+            description: 'Token bootstrap disponibile.',
             value: updaterStatus.data.hasSetupToken ? 'ok' : 'missing',
             ok: updaterStatus.data.hasSetupToken,
           },
           {
-            label: 'Installazione',
-            description: 'Stato singleton `app_installation`.',
+            label: 'Stato installazione',
+            description: setupStatus.data?.message || 'Preparazione in corso',
             value: installation?.setupStatus || 'pending',
-            ok: !completed,
+            ok: phase === 'completed' || phase === 'ready',
           },
         ])
 
         if (completed) {
-          showMessage('Setup gia completato. Dashboard pronta.')
-          submitButton.disabled = true
+          showOpenApp(appUrl || lastAppUrl)
+          setFormEnabled(false)
+          submitButton.textContent = 'Setup completato'
+          showMessage('Installazione completata. Apri RicercaCasa.')
+          return
         }
+
+        if (phase === 'ready') {
+          setFormEnabled(true)
+          submitButton.textContent = 'Completa setup'
+          showMessage('Pronto per configurazione iniziale.')
+          return
+        }
+
+        setFormEnabled(false)
+        submitButton.textContent = 'Preparazione in corso...'
+        showMessage('Preparazione in corso. Riprovo automaticamente.')
+        window.setTimeout(() => {
+          loadStatus().catch(() => undefined)
+        }, 2000)
       }
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault()
-        submitButton.disabled = true
+        setFormEnabled(false)
         showMessage('Salvataggio setup in corso...')
 
         const payload = {
@@ -295,16 +344,20 @@
             throw new Error(data.error || 'Setup fallito')
           }
 
-          showMessage('Setup completato. Ora puoi aprire dashboard.')
+          showMessage('Setup completato. Apri RicercaCasa.')
           await loadStatus()
         } catch (error) {
           showMessage(error.message || 'Setup fallito', 'error')
-          submitButton.disabled = false
+          setFormEnabled(true)
         }
       })
 
       loadStatus().catch((error) => {
-        showMessage(error.message || 'Caricamento stato fallito', 'error')
+        setFormEnabled(false)
+        showMessage(error.message || 'Preparazione in corso. Riprovo automaticamente.')
+        window.setTimeout(() => {
+          loadStatus().catch(() => undefined)
+        }, 2000)
       })
     </script>
   </body>
