@@ -23,15 +23,19 @@ async function getStatus() {
 async function completeSetup(input, installedVersion) {
   const normalized = normalizeProfileInput(input);
   const client = await pool.connect();
+  let transactionStarted = false;
 
   try {
-    const installationBeforeUpdate = await appInstallationRepository.getSingleton(client);
+    await client.query("BEGIN");
+    transactionStarted = true;
+    const installationBeforeUpdate = await appInstallationRepository.getSingleton(client, {
+      forUpdate: true,
+    });
 
     if (installationBeforeUpdate?.setupStatus === "completed") {
       throw new AppError("Setup gia completato", 409, "SETUP_ALREADY_COMPLETED");
     }
 
-    await client.query("BEGIN");
     const preferences = await userPreferencesRepository.updateSingleton(client, normalized);
     const installation = await appInstallationRepository.completeSetup(
       client,
@@ -41,7 +45,9 @@ async function completeSetup(input, installedVersion) {
 
     return { installation, preferences };
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (transactionStarted) {
+      await client.query("ROLLBACK");
+    }
     throw error;
   } finally {
     client.release();

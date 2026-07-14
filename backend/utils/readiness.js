@@ -4,14 +4,18 @@ const path = require("path");
 function getLocalMigrationNames(migrationsDir) {
   return fs
     .readdirSync(migrationsDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
+    .filter((entry) => entry.isFile() && /^\d+.*\.(js|cjs|mjs|ts|sql)$/.test(entry.name))
     .map((entry) => path.parse(entry.name).name)
     .sort();
 }
 
 function areRequiredMigrationsApplied(localMigrationNames, appliedMigrationNames) {
+  const local = new Set(localMigrationNames);
   const applied = new Set(appliedMigrationNames);
-  return localMigrationNames.every((migrationName) => applied.has(migrationName));
+  return (
+    localMigrationNames.every((migrationName) => applied.has(migrationName)) &&
+    appliedMigrationNames.every((migrationName) => local.has(migrationName))
+  );
 }
 
 async function getReadinessStatus({ pool, migrationsDir }) {

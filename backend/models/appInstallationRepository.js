@@ -1,4 +1,4 @@
-async function getSingleton(queryable) {
+async function getSingleton(queryable, { forUpdate = false } = {}) {
   const result = await queryable.query(
     `SELECT id,
             installation_uuid AS "installationUuid",
@@ -9,7 +9,7 @@ async function getSingleton(queryable) {
             created_at AS "createdAt",
             updated_at AS "updatedAt"
      FROM app_installation
-     WHERE id = 1`
+     WHERE id = 1${forUpdate ? " FOR UPDATE" : ""}`
   );
 
   return result.rows[0] || null;

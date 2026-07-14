@@ -348,7 +348,6 @@ Non copre ancora:
 - state machine completa update;
 - self-update updater;
 - rollback coordinato.
-- non bloccanti, se soltanto la nuova funzione deve restare disabilitata.
 
 ---
 

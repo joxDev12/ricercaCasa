@@ -21,3 +21,13 @@ test("readiness passes when all local migrations are applied", () => {
     true
   );
 });
+
+test("readiness fails when database contains unknown migration", () => {
+  assert.equal(
+    areRequiredMigrationsApplied(
+      ["001_create_sources"],
+      ["001_create_sources", "999_future_migration"]
+    ),
+    false
+  );
+});
