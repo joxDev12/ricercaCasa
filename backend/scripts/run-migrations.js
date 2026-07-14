@@ -66,7 +66,7 @@ function listMigrationFiles(migrationsDir = getMigrationsDir()) {
   return fs
     .readdirSync(migrationsDir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && /^\d+.*\.(js|cjs|mjs|ts|sql)$/.test(entry.name))
-    .map((entry) => entry.name)
+    .map((entry) => path.parse(entry.name).name)
     .sort();
 }
 

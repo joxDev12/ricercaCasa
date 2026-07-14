@@ -76,10 +76,12 @@ test("buildDatabaseUrl throws clear error when params are incomplete", () => {
 
 test("getMigrationStatus reports applied and pending migrations", async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ricercacasa-status-"));
-  const migrationA = "001_first.js";
-  const migrationB = "002_second.js";
-  fs.writeFileSync(path.join(tmpDir, migrationA), "exports.up = () => {};\n");
-  fs.writeFileSync(path.join(tmpDir, migrationB), "exports.up = () => {};\n");
+  const migrationAFile = "001_first.js";
+  const migrationBFile = "002_second.js";
+  const migrationA = "001_first";
+  const migrationB = "002_second";
+  fs.writeFileSync(path.join(tmpDir, migrationAFile), "exports.up = () => {};\n");
+  fs.writeFileSync(path.join(tmpDir, migrationBFile), "exports.up = () => {};\n");
 
   const calls = [];
   const fakeClient = {
@@ -128,8 +130,9 @@ test("getMigrationStatus reports applied and pending migrations", async () => {
 
 test("getMigrationStatus treats missing pgmigrations table as all pending", async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ricercacasa-status-"));
-  const migrationA = "001_first.js";
-  fs.writeFileSync(path.join(tmpDir, migrationA), "exports.up = () => {};\n");
+  const migrationAFile = "001_first.js";
+  const migrationA = "001_first";
+  fs.writeFileSync(path.join(tmpDir, migrationAFile), "exports.up = () => {};\n");
 
   const fakeClient = {
     async connect() {},
