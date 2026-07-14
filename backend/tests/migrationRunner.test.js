@@ -6,6 +6,7 @@ const test = require("node:test");
 const {
   buildDatabaseUrl,
   getDatabasePassword,
+  getMigrationStatus,
 } = require("../scripts/run-migrations");
 
 test("buildDatabaseUrl returns DATABASE_URL when provided", () => {
@@ -71,4 +72,94 @@ test("buildDatabaseUrl throws clear error when params are incomplete", () => {
       }),
     /Missing database password/
   );
+});
+
+test("getMigrationStatus reports applied and pending migrations", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ricercacasa-status-"));
+  const migrationA = "001_first.js";
+  const migrationB = "002_second.js";
+  fs.writeFileSync(path.join(tmpDir, migrationA), "exports.up = () => {};\n");
+  fs.writeFileSync(path.join(tmpDir, migrationB), "exports.up = () => {};\n");
+
+  const calls = [];
+  const fakeClient = {
+    async connect() {
+      calls.push("connect");
+    },
+    async query(sql) {
+      calls.push(sql);
+      return {
+        rows: [{ name: migrationA }],
+      };
+    },
+    async end() {
+      calls.push("end");
+    },
+  };
+
+  try {
+    const status = await getMigrationStatus(
+      {
+        DATABASE_URL: "postgres://user:pass@db:5432/ricercacasa",
+      },
+      {
+        clientFactory(connectionString) {
+          assert.equal(connectionString, "postgres://user:pass@db:5432/ricercacasa");
+          return fakeClient;
+        },
+        migrationsDir: tmpDir,
+      }
+    );
+
+    assert.deepEqual(status, {
+      applied: [migrationA],
+      pending: [migrationB],
+      unknown: [],
+    });
+    assert.deepEqual(calls, [
+      "connect",
+      "SELECT name FROM pgmigrations ORDER BY run_on ASC, id ASC",
+      "end",
+    ]);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("getMigrationStatus treats missing pgmigrations table as all pending", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ricercacasa-status-"));
+  const migrationA = "001_first.js";
+  fs.writeFileSync(path.join(tmpDir, migrationA), "exports.up = () => {};\n");
+
+  const fakeClient = {
+    async connect() {},
+    async query() {
+      const error = new Error('relation "pgmigrations" does not exist');
+      error.code = "42P01";
+      throw error;
+    },
+    async end() {},
+  };
+
+  try {
+    const status = await getMigrationStatus(
+      {
+        DATABASE_URL: "postgres://user:pass@db:5432/ricercacasa",
+      },
+      {
+        clientFactory() {
+          return fakeClient;
+        },
+        migrationsDir: tmpDir,
+      }
+    );
+
+    assert.deepEqual(status, {
+      applied: [],
+      pending: [migrationA],
+      unknown: [],
+    });
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });

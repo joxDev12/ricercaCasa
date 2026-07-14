@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { Client } = require("pg");
 
 function readSecretFile(secretFilePath, envName) {
   if (!secretFilePath) {
@@ -57,8 +58,86 @@ function getMigrationCommand(action) {
   throw new Error(`Unsupported migration action: ${action}`);
 }
 
-function runMigrations(action, env = process.env) {
+function getMigrationsDir() {
+  return path.join(__dirname, "..", "migrations");
+}
+
+function listMigrationFiles(migrationsDir = getMigrationsDir()) {
+  return fs
+    .readdirSync(migrationsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /^\d+.*\.(js|cjs|mjs|ts|sql)$/.test(entry.name))
+    .map((entry) => entry.name)
+    .sort();
+}
+
+async function getMigrationStatus(
+  env = process.env,
+  {
+    clientFactory = (connectionString) => new Client({ connectionString }),
+    migrationsDir = getMigrationsDir(),
+  } = {}
+) {
+  const databaseUrl = buildDatabaseUrl(env);
+  const expectedMigrations = listMigrationFiles(migrationsDir);
+  const client = clientFactory(databaseUrl);
+
+  await client.connect();
+
+  try {
+    let appliedMigrations = [];
+
+    try {
+      const result = await client.query(
+        "SELECT name FROM pgmigrations ORDER BY run_on ASC, id ASC"
+      );
+      appliedMigrations = result.rows.map((row) => row.name).filter(Boolean);
+    } catch (error) {
+      if (error?.code !== "42P01") {
+        throw error;
+      }
+    }
+
+    const appliedSet = new Set(appliedMigrations);
+    const expectedSet = new Set(expectedMigrations);
+
+    return {
+      applied: expectedMigrations.filter((name) => appliedSet.has(name)),
+      pending: expectedMigrations.filter((name) => !appliedSet.has(name)),
+      unknown: appliedMigrations.filter((name) => !expectedSet.has(name)),
+    };
+  } finally {
+    await client.end();
+  }
+}
+
+function logMigrationStatus(status) {
+  console.log(`Applied migrations: ${status.applied.length}`);
+  console.log(`Pending migrations: ${status.pending.length}`);
+
+  if (status.pending.length > 0) {
+    console.log(status.pending.join("\n"));
+  }
+
+  if (status.unknown.length > 0) {
+    console.log(`Unknown migrations in database: ${status.unknown.length}`);
+    console.log(status.unknown.join("\n"));
+  }
+}
+
+async function runMigrations(action, env = process.env) {
   const command = getMigrationCommand(action);
+
+  if (command === "status") {
+    const status = await getMigrationStatus(env);
+    logMigrationStatus(status);
+
+    if (status.pending.length > 0 || status.unknown.length > 0) {
+      process.exitCode = 1;
+    }
+
+    return status;
+  }
+
   const databaseUrl = buildDatabaseUrl(env);
   const nodePgMigrateBin = path.join(
     __dirname,
@@ -68,10 +147,9 @@ function runMigrations(action, env = process.env) {
     "bin",
     "node-pg-migrate.js"
   );
-
   const result = spawnSync(
     process.execPath,
-    [nodePgMigrateBin, command, "-m", path.join(__dirname, "..", "migrations")],
+    [nodePgMigrateBin, command, "-m", getMigrationsDir()],
     {
       env: {
         ...env,
@@ -91,20 +169,24 @@ function runMigrations(action, env = process.env) {
 }
 
 if (require.main === module) {
-  try {
-    runMigrations(process.argv[2] || "up");
-  } catch (error) {
-    console.error(
-      error instanceof Error ? error.message : "Migration runner failed"
-    );
-    process.exit(1);
-  }
+  void (async () => {
+    try {
+      await runMigrations(process.argv[2] || "up");
+    } catch (error) {
+      console.error(
+        error instanceof Error ? error.message : "Migration runner failed"
+      );
+      process.exit(1);
+    }
+  })();
 }
 
 module.exports = {
   buildDatabaseUrl,
   getDatabasePassword,
   getMigrationCommand,
+  getMigrationStatus,
+  listMigrationFiles,
   readSecretFile,
   runMigrations,
 };
