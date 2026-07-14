@@ -48,6 +48,13 @@ test("builds filtered Idealista URLs", () => {
   );
 });
 
+test("builds paginated Idealista URLs", () => {
+  assert.equal(
+    buildSearchUrl({ ...criteria, page: 2 }),
+    "https://www.idealista.it/affitto-case/perugia-perugia/con-prezzo_500/lista-2.htm"
+  );
+});
+
 test("parses translated Idealista cards and enforces max price", () => {
   const result = parseSearchHtml(html, criteria);
 
@@ -65,6 +72,13 @@ test("finds specific zone URL in translated breadcrumbs", () => {
   assert.equal(
     findSpecificLocationUrl(html, criteria),
     "https://www.idealista.it/affitto-case/perugia/fontignano-mugnano/con-prezzo_500/"
+  );
+});
+
+test("paginates specific Idealista zone URLs", () => {
+  assert.equal(
+    findSpecificLocationUrl(html, { ...criteria, page: 2 }),
+    "https://www.idealista.it/affitto-case/perugia/fontignano-mugnano/con-prezzo_500/lista-2.htm"
   );
 });
 

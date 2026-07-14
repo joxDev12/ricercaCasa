@@ -59,7 +59,7 @@ export function SearchResults() {
         {results.map((listing) => (
           <SearchResultCard
             compact={viewMode === 'grid'}
-            key={listing.externalId}
+            key={`${listing.provider}:${listing.externalId}`}
             listing={listing}
           />
         ))}

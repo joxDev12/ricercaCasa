@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { normalizeFavoriteInput } = require("../services/favoriteService");
+const {
+  normalizeFavoriteInput,
+  saveFavorite,
+} = require("../services/favoriteService");
 
 test("normalizes a search result for persistence", () => {
   const result = normalizeFavoriteInput({
@@ -23,4 +26,16 @@ test("normalizes a search result for persistence", () => {
   assert.equal(result.images[0].isPrimary, true);
   assert.equal(result.latitude, null);
   assert.equal(result.longitude, null);
+});
+
+test("rejects multiple listings from the same provider in one favorite", async () => {
+  await assert.rejects(
+    saveFavorite({
+      variants: [
+        { provider: "immobiliare_it", externalId: "1" },
+        { provider: "immobiliare_it", externalId: "2" },
+      ],
+    }),
+    /stesso provider/
+  );
 });

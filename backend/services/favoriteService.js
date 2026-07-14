@@ -140,6 +140,11 @@ async function saveFavorite(input) {
   let variants = resolveFavoriteVariants(input);
   let primaryListingId = null;
   let status = "created";
+
+  if (new Set(variants.map((variant) => variant.provider)).size !== variants.length) {
+    throw new ValidationError("Una scheda non puo contenere piu annunci dello stesso provider");
+  }
+
   const client = await pool.connect();
 
   try {

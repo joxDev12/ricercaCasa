@@ -36,12 +36,38 @@ export function usePropertySearch() {
     }
 
     setLoading(true)
+    setError(null)
 
     try {
-      const nextCriteria = { ...criteria, page: criteria.page + 1 }
+      const providers = criteria.providers.filter(
+        (provider) => meta.providers[provider]?.hasNextPage,
+      )
+      const pagination = Object.fromEntries(
+        providers.map((provider) => [
+          provider,
+          (meta.providers[provider]?.page ?? criteria.page) + 1,
+        ]),
+      )
+      const nextCriteria = { ...criteria, providers, pagination, page: criteria.page + 1 }
       const response = await searchApi(nextCriteria)
-      setCriteria(nextCriteria)
-      setResultsState([...results, ...response.data], response.meta)
+      const seen = new Set(
+        results.map((listing) => `${listing.provider}:${listing.externalId}`),
+      )
+      const newResults = response.data.filter(
+        (listing) => !seen.has(`${listing.provider}:${listing.externalId}`),
+      )
+
+      if (!newResults.length) {
+        setResultsState(results, {
+          ...response.meta,
+          page: criteria.page,
+          hasNextPage: false,
+        })
+        return
+      }
+
+      setCriteria({ ...criteria, pagination, page: nextCriteria.page })
+      setResultsState([...results, ...newResults], response.meta)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Caricamento fallito')
     } finally {

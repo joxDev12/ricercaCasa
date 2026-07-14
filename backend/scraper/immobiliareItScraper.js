@@ -543,10 +543,7 @@ async function searchUrl(url, criteria) {
 
     try {
       html = await fetchTranslatedHtml(url);
-    } catch (translateError) {
-      if (/404/.test(translateError.message)) {
-        throw translateError;
-      }
+    } catch (_translateError) {
       return parseSearchMarkdown(await fetchReader(url), criteria);
     }
   }

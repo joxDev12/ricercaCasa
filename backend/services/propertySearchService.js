@@ -122,7 +122,7 @@ async function search(criteria) {
             status: "success",
             count: success.data.length,
             page: success.meta.page,
-            hasNextPage: success.meta.hasNextPage,
+            hasNextPage: success.data.length > 0 && success.meta.hasNextPage,
             totalResults: success.meta.totalResults,
           },
         ];
@@ -144,7 +144,9 @@ async function search(criteria) {
     data: aggregated,
     meta: {
       page: criteria.page || 1,
-      hasNextPage: successes.some((item) => item.meta.hasNextPage),
+      hasNextPage: successes.some(
+        (item) => item.data.length > 0 && item.meta.hasNextPage
+      ),
       totalResults: aggregated.length,
       providers: providersMeta,
       warnings,

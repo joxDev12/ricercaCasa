@@ -76,6 +76,20 @@ function tokenSimilarity(left, right) {
   return matches / Math.min(leftSet.size, rightSet.size);
 }
 
+function normalizeImageUrl(value) {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    url.search = "";
+    url.hash = "";
+    url.pathname = url.pathname.replace(/\/\d{2,4}x\d{2,4}(?=\/)/g, "");
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function normalizeLocationKey(listing) {
   const parts = [
     listing.region,
@@ -115,9 +129,15 @@ function numberBucket(value, size) {
 function buildDedupeData(listing) {
   const municipality = inferMunicipality(listing);
   const street = inferStreet(listing);
+  const imageUrls = [
+    listing.mainImageUrl,
+    ...(Array.isArray(listing.images)
+      ? listing.images.map((image) => image?.imageUrl || image?.url)
+      : []),
+  ];
 
   return {
-    version: 2,
+    version: 3,
     municipality,
     district: normalizeText(listing.district),
     street,
@@ -139,7 +159,10 @@ function buildDedupeData(listing) {
       : null,
     titleTokens: (normalizeText(listing.title) || "").split(" ").filter(Boolean),
     comparableTitleTokens: tokenize(listing.title),
-    descriptionTokens: tokenize(listing.description || listing.shortDescription),
+    descriptionTokens: tokenize(
+      [listing.description, listing.shortDescription].filter(Boolean).join(" ")
+    ),
+    imageUrls: [...new Set(imageUrls.map(normalizeImageUrl).filter(Boolean))],
     advertiser: normalizeText(listing.advertiserName),
   };
 }
@@ -167,6 +190,15 @@ function buildDedupeFingerprint(listing) {
 
 function compareListings(first, second) {
   if (
+    first.provider &&
+    second.provider &&
+    first.provider === second.provider &&
+    String(first.externalId) !== String(second.externalId)
+  ) {
+    return { score: 0, strongSignal: false, reasons: [] };
+  }
+
+  if (
     first.transactionType &&
     second.transactionType &&
     first.transactionType !== second.transactionType
@@ -174,8 +206,12 @@ function compareListings(first, second) {
     return { score: 0, strongSignal: false, reasons: [] };
   }
 
-  const left = first.dedupeData || buildDedupeData(first);
-  const right = second.dedupeData || buildDedupeData(second);
+  const left = first.dedupeData?.version >= 3
+    ? first.dedupeData
+    : buildDedupeData(first);
+  const right = second.dedupeData?.version >= 3
+    ? second.dedupeData
+    : buildDedupeData(second);
   let score = 0;
   let strongSignal = false;
   const reasons = [];
@@ -191,6 +227,9 @@ function compareListings(first, second) {
   const descriptionSimilarity = tokenSimilarity(
     left.descriptionTokens || [],
     right.descriptionTokens || []
+  );
+  const sameImage = (left.imageUrls || []).some((url) =>
+    (right.imageUrls || []).includes(url)
   );
   let coreMatches = 0;
 
@@ -255,6 +294,11 @@ function compareListings(first, second) {
     reasons.push({ signal: "similar_description", weight: 0.15 });
   }
 
+  if (sameImage) {
+    score += 0.25;
+    reasons.push({ signal: "same_image_url", weight: 0.25 });
+  }
+
   const sameAdvertiser =
     left.advertiser && right.advertiser && left.advertiser === right.advertiser;
   if (sameAdvertiser) {
@@ -267,7 +311,11 @@ function compareListings(first, second) {
       sameMunicipality &&
       coreMatches >= 2 &&
       (sameCivicNumber || descriptionSimilarity >= 0.2 || sameAdvertiser)
-  ) || Boolean(titleSimilarity >= 0.75 && descriptionSimilarity >= 0.5 && coreMatches >= 3);
+  ) || Boolean(
+    titleSimilarity >= 0.75 && descriptionSimilarity >= 0.5 && coreMatches >= 3
+  ) || Boolean(sameImage && sameMunicipality && coreMatches >= 2);
+
+  if (strongSignal) score = Math.max(score, 0.85);
 
   return {
     score: Math.min(1, Number(score.toFixed(4))),

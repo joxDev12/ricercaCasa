@@ -65,6 +65,26 @@ test("keeps different listings separate when only price and size match", () => {
   assert.equal(results.length, 2);
 });
 
+test("never groups different listings from the same provider", () => {
+  const shared = {
+    provider: "immobiliare_it",
+    transactionType: "rent",
+    title: "Appartamento via Pienza 54, Centro, Potenza",
+    locationLabel: "Via Pienza 54, Centro, Potenza",
+    shortDescription: "Appartamento con balcone in strada privata",
+    price: 800,
+    surfaceM2: 90,
+    rooms: 4,
+    mainImageUrl: "https://pwm.im-cdn.it/image/same.jpg",
+  };
+  const results = aggregateSearchResults([
+    { ...shared, externalId: "1" },
+    { ...shared, externalId: "2", price: 850 },
+  ]);
+
+  assert.equal(results.length, 2);
+});
+
 test("never groups rent and sale listings", () => {
   const listing = {
     title: "Bilocale via Roma, Senigallia",
@@ -80,4 +100,64 @@ test("never groups rent and sale listings", () => {
   ]);
 
   assert.equal(results.length, 2);
+});
+
+test("groups the same listing when titles differ but details and descriptions agree", () => {
+  const shared = {
+    transactionType: "rent",
+    price: 350,
+    surfaceM2: 25,
+    rooms: 1,
+    advertiserName: "Innova Immobiliare",
+  };
+  const results = aggregateSearchResults([
+    {
+      ...shared,
+      provider: "immobiliare_it",
+      externalId: "1",
+      title: "Loft piazza XXI Aprile 19, Isola delle Femmine",
+      locationLabel: "Piazza XXI Aprile, Isola delle Femmine",
+      shortDescription: "Monolocale arredato a 200m dal mare - Isola delle Femmine",
+    },
+    {
+      ...shared,
+      provider: "idealista_it",
+      externalId: "2",
+      title: "Monolocale in Piazza 21 Aprile, 19, Isola delle Femmine",
+      locationLabel: "Isola delle Femmine",
+      shortDescription:
+        "A Isola delle Femmine, a soli 200 metri dal mare, Innova Immobiliare propone in locazione",
+    },
+  ]);
+
+  assert.equal(results.length, 1);
+  assert.equal(results[0].sourceCount, 2);
+});
+
+test("uses canonical image URLs as a strong duplicate signal", () => {
+  const shared = {
+    transactionType: "rent",
+    locationLabel: "Isola delle Femmine",
+    price: 350,
+    surfaceM2: 25,
+    rooms: 1,
+  };
+  const results = aggregateSearchResults([
+    {
+      ...shared,
+      provider: "casa_it",
+      externalId: "1",
+      title: "Loft vicino al mare",
+      mainImageUrl: "https://images.example/360x265/listing/home.jpg?cache=1",
+    },
+    {
+      ...shared,
+      provider: "idealista_it",
+      externalId: "2",
+      title: "Monolocale arredato",
+      mainImageUrl: "https://images.example/800x600/listing/home.jpg",
+    },
+  ]);
+
+  assert.equal(results.length, 1);
 });
