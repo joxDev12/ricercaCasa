@@ -334,6 +334,14 @@ docker compose -f deployment/compose.yaml --env-file deployment/release.env down
 
 ### Stato updater attuale
 
+Installazione pubblica senza repository (asset GitHub Release):
+
+```bash
+curl -fsSL https://github.com/joxDev12/ricercaCasa/releases/download/v3.0.0/install.sh | bash
+```
+
+Bootstrap crea `~/.ricercacasa`, genera secret `600` e avvia soltanto updater. Updater scarica immagini, esegue migrazioni e avvia stack applicativo.
+
 Updater presente oggi copre:
 
 - pagina wizard iniziale;

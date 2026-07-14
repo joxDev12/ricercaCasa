@@ -3,7 +3,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8081
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends gosu \
+  && apt-get install -y --no-install-recommends gosu docker.io docker-compose-v2 \
   && rm -rf /var/lib/apt/lists/*
 COPY --chown=node:node . .
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

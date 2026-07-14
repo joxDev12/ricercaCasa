@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "platformVersion": "3.0.0",
+  "updaterVersion": "1.0.0",
+  "releasedAt": "__RELEASED_AT__",
+  "minimumUpdaterVersion": "1.0.0",
+  "images": {
+    "backend": {"reference": "ghcr.io/joxdev12/ricercacasa-backend@sha256:__BACKEND_DIGEST__", "version": "3.0.0"},
+    "frontend": {"reference": "ghcr.io/joxdev12/ricercacasa-frontend@sha256:__FRONTEND_DIGEST__", "version": "3.0.0"},
+    "updater": {"reference": "ghcr.io/joxdev12/ricercacasa-updater@sha256:__UPDATER_DIGEST__", "version": "1.0.0"}
+  },
+  "assets": {
+    "compose": {"name": "compose.yaml", "sha256": "__COMPOSE_SHA256__"},
+    "releaseEnv": {"name": "release.env.example", "sha256": "__RELEASE_ENV_SHA256__"}
+  },
+  "database": {"migrationMode": "forward-only", "backupRequired": false},
+  "releaseNotes": []
+}

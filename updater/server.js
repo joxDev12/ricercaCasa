@@ -2,6 +2,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
 const { URL } = require("node:url");
+const { createDockerClient } = require("./dockerClient");
+const { createInstallService } = require("./installService");
+const { createJobStore } = require("./jobStore");
+const { validateManifest } = require("./manifestService");
 
 const BODY_LIMIT_BYTES = 64 * 1024;
 
@@ -20,6 +24,9 @@ function createConfig(env = process.env) {
     backendInternalUrl: env.BACKEND_INTERNAL_URL || "http://backend:3000",
     releaseManifestPath:
       env.RELEASE_MANIFEST_PATH || "/state/manifests/latest.json",
+    installationDir: env.INSTALLATION_DIR || "/installation",
+    composeFilePath: env.COMPOSE_FILE_PATH || `${env.INSTALLATION_DIR || "/installation"}/compose.yaml`,
+    releaseEnvPath: env.RELEASE_ENV_PATH || `${env.INSTALLATION_DIR || "/installation"}/release.env`,
     appPublicOrigin:
       env.APP_PUBLIC_ORIGIN || `http://127.0.0.1:${env.APP_PORT || "8080"}`,
     setupToken: readSecret(env.SETUP_TOKEN, env.SETUP_TOKEN_FILE),
@@ -44,6 +51,17 @@ function sendFile(res, filePath, contentType) {
     "Content-Length": file.length,
   });
   res.end(file);
+}
+
+function assertLocalMutation(req) {
+  const host = (req.headers.host || "").split(":")[0];
+  const origin = req.headers.origin;
+  if (!/^(127\.0\.0\.1|localhost|::1)$/.test(host) || (origin && !/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(origin))) {
+    const error = new Error("Richiesta updater non locale");
+    error.statusCode = 403;
+    error.code = "LOCAL_ONLY";
+    throw error;
+  }
 }
 
 async function readRequestBody(req, limitBytes = BODY_LIMIT_BYTES) {
@@ -177,7 +195,7 @@ function getLatestManifest(config) {
 
   try {
     return {
-      data: JSON.parse(fs.readFileSync(config.releaseManifestPath, "utf8")),
+      data: validateManifest(JSON.parse(fs.readFileSync(config.releaseManifestPath, "utf8"))),
       statusCode: 200,
     };
   } catch (_error) {
@@ -192,6 +210,12 @@ function getLatestManifest(config) {
 }
 
 function createServer(config = createConfig()) {
+  const store = createJobStore(config.installationDir);
+  const installService = createInstallService({
+    config,
+    store,
+    docker: createDockerClient(config),
+  });
   return http.createServer(async (req, res) => {
     try {
       const requestUrl = new URL(req.url, `http://${req.headers.host}`);
@@ -203,7 +227,39 @@ function createServer(config = createConfig()) {
       }
 
       if (req.method === "GET" && requestUrl.pathname === "/updater/status") {
-        sendJson(res, 200, { data: getUpdaterStatus(config) });
+        sendJson(res, 200, { data: { ...getUpdaterStatus(config), installation: installService.current() } });
+        return;
+      }
+
+      if (req.method === "GET" && requestUrl.pathname === "/updater/install/status") {
+        sendJson(res, 200, { data: installService.current() });
+        return;
+      }
+
+      if (req.method === "POST" && requestUrl.pathname === "/updater/install/start") {
+        assertLocalMutation(req);
+        sendJson(res, 202, { data: installService.start() });
+        return;
+      }
+
+      const jobMatch = requestUrl.pathname.match(/^\/updater\/jobs\/([^/]+)$/);
+      if (req.method === "GET" && jobMatch) {
+        const job = installService.current();
+        sendJson(res, job?.jobId === jobMatch[1] ? 200 : 404, job?.jobId === jobMatch[1] ? { data: job } : { error: "Job non trovato", code: "JOB_NOT_FOUND" });
+        return;
+      }
+
+      const logsMatch = requestUrl.pathname.match(/^\/updater\/jobs\/([^/]+)\/logs$/);
+      if (req.method === "GET" && logsMatch) {
+        const job = installService.current();
+        if (job?.jobId !== logsMatch[1]) {
+          sendJson(res, 404, { error: "Job non trovato", code: "JOB_NOT_FOUND" });
+          return;
+        }
+        const logPath = path.join(config.installationDir, "state", "logs", `${job.jobId}.log`);
+        const logs = fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf8") : "";
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end(logs);
         return;
       }
 
@@ -213,6 +269,7 @@ function createServer(config = createConfig()) {
       }
 
       if (req.method === "POST" && requestUrl.pathname === "/updater/setup/complete") {
+        assertLocalMutation(req);
         await proxySetupComplete(req, res, config);
         return;
       }

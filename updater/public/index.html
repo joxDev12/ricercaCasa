@@ -210,6 +210,7 @@
       const formControls = Array.from(form.querySelectorAll('input, select, button'))
 
       let lastAppUrl = ''
+      let installRequested = false
 
       timezoneInput.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome'
 
@@ -255,13 +256,16 @@
       }
 
       async function loadStatus() {
-        const [updaterStatusResponse, setupStatusResponse] = await Promise.all([
+        const [updaterStatusResponse, setupStatusResponse, installStatusResponse] = await Promise.all([
           fetch('/updater/status'),
           fetch('/updater/setup/status'),
+          fetch('/updater/install/status'),
         ])
 
         const updaterStatus = await updaterStatusResponse.json()
         const setupStatus = await setupStatusResponse.json()
+        const installStatus = await installStatusResponse.json()
+        const installJob = installStatus.data
         const installation = setupStatus.data?.installation
         const phase = setupStatus.data?.phase || 'preparing'
         const completed = setupStatus.data?.completed === true
@@ -289,10 +293,34 @@
           {
             label: 'Stato installazione',
             description: setupStatus.data?.message || 'Preparazione in corso',
-            value: installation?.setupStatus || 'pending',
-            ok: phase === 'completed' || phase === 'ready',
+            value: installJob?.phase || installation?.setupStatus || 'pending',
+            ok: installJob?.status === 'completed' || phase === 'completed' || phase === 'ready',
           },
         ])
+
+        if (!installJob && !installRequested) {
+          installRequested = true
+          await fetch('/updater/install/start', { method: 'POST' })
+          window.setTimeout(() => loadStatus().catch(() => undefined), 500)
+          setFormEnabled(false)
+          submitButton.textContent = 'Preparazione in corso...'
+          showMessage('Preparazione in corso. Riprovo automaticamente.')
+          return
+        }
+
+        if (installJob?.status === 'running') {
+          setFormEnabled(false)
+          submitButton.textContent = 'Preparazione in corso...'
+          showMessage(`Preparazione in corso: ${installJob.phase}`)
+          window.setTimeout(() => loadStatus().catch(() => undefined), 2000)
+          return
+        }
+
+        if (installJob?.status === 'failed') {
+          setFormEnabled(false)
+          showMessage(installJob.error?.message || 'Installazione fallita', 'error')
+          return
+        }
 
         if (completed) {
           showOpenApp(appUrl || lastAppUrl)

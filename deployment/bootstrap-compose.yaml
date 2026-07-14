@@ -1,0 +1,21 @@
+name: ricercacasa-bootstrap
+
+services:
+  updater:
+    image: ghcr.io/joxdev12/ricercacasa-updater:1.0.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${UPDATER_PORT:-8081}:8081"
+    environment:
+      PORT: 8081
+      UPDATER_VERSION: 1.0.0
+      PLATFORM_VERSION: 3.0.0
+      INSTALLATION_DIR: /installation
+      SETUP_TOKEN_FILE: /installation/secrets/setup_token
+      RELEASE_MANIFEST_PATH: /installation/manifest.json
+      COMPOSE_FILE_PATH: /installation/compose.yaml
+      RELEASE_ENV_PATH: /installation/release.env
+      APP_PUBLIC_ORIGIN: http://127.0.0.1:${APP_PORT:-8080}
+    volumes:
+      - ${RICERCACASA_HOME:?RICERCACASA_HOME is required}:/installation
+      - /var/run/docker.sock:/var/run/docker.sock
