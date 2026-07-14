@@ -21,11 +21,13 @@ project="ricercacasa-smoke-$$"
 backend_port="${UPDATER_SMOKE_BACKEND_PORT:-$((13000 + $$ % 1000))}"
 home_dir="$(mktemp -d "$PWD/.updater-smoke.XXXXXX")"
 registry="127.0.0.1:${registry_port}"
+control_network="${project}-control"
 
 cleanup() {
   set +e
-  docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" down -v --remove-orphans
   docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" down -v --remove-orphans
+  docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" down -v --remove-orphans
+  docker network rm "$control_network" >/dev/null 2>&1
   docker rm -f "$registry_name" >/dev/null 2>&1
   rm -rf "$home_dir"
 }
@@ -69,6 +71,7 @@ chmod 600 "$home_dir/manifest.json"
 
 export RICERCACASA_HOME="$home_dir" ALLOWED_IMAGE_NAMESPACE="$registry" COMPOSE_PROJECT_NAME="$project" BACKEND_PORT="$backend_port"
 export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+export RICERCACASA_CONTROL_NETWORK="$control_network"
 docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" up -d
 echo "[pre-install] verifica servizi applicativi assenti"
 if docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" ps --status running --services | grep -Eq '^(database|migrate|backend|frontend)$'; then
@@ -122,20 +125,32 @@ for _ in {1..180}; do
   sleep 2
 done
 grep -q '"status":"completed"' <<<"$status"
+echo "[post-install] backend health/ready via rete control"
+if ! docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user "$runtime_user" updater curl -fsS http://backend:3000/health/ready >/dev/null; then
+  echo "FAIL post-install: backend health/ready via rete control" >&2
+  exit 1
+fi
+echo "[post-install] frontend health"
 docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" ps
 wait_http http://127.0.0.1:8080/health
+echo "[post-install] backend ready"
 wait_http http://127.0.0.1:8081/health
 for _ in {1..60}; do
   docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" exec -T backend node -e "fetch('http://127.0.0.1:3000/health/ready').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" && break
   sleep 2
 done
+echo "[post-install] setup status"
 setup_status=""
 for _ in {1..60}; do
   setup_status="$(curl -fsS http://127.0.0.1:8081/updater/setup/status 2>/dev/null || true)"
   grep -q '"ready":true' <<<"$setup_status" && break
   sleep 2
 done
-grep -q '"ready":true' <<<"$setup_status"
+if ! grep -q '"ready":true' <<<"$setup_status"; then
+  echo "FAIL post-install: setup status non ready: ${setup_status:-<vuoto>}" >&2
+  exit 1
+fi
+echo "[post-install] secret ownership"
 test "$(stat -c '%a' "$home_dir/secrets/postgres_password")" = 600
 for secret in postgres_password app_secret setup_token; do
   secret_stat="$(stat -c '%u %g %a' "$home_dir/secrets/$secret")"
@@ -147,6 +162,12 @@ done
 test -s "$home_dir/state/installation.json"
 job_id="$(printf '%s' "$status" | sed -n 's/.*"jobId":"\([^"]*\)".*/\1/p')"
 test -s "$home_dir/state/logs/${job_id}.log"
-docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" restart updater
-wait_http http://127.0.0.1:8081/updater/install/status
-curl -fsS http://127.0.0.1:8081/updater/install/status | grep -q '"status":"completed"'
+echo "[post-install] state/log persistence"
+echo "[post-install] restart updater"
+docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" restart updater || true
+sleep 5
+post_restart_status="$(curl -sS http://127.0.0.1:8081/updater/install/status 2>/dev/null || true)"
+if ! grep -q '"status":"completed"' <<<"$post_restart_status"; then
+  echo "FAIL post-install: stato non persistente dopo restart: ${post_restart_status:-<vuoto>}" >&2
+  exit 1
+fi

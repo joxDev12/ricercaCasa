@@ -15,13 +15,16 @@ services:
       RELEASE_ENV_PATH: ${RICERCACASA_HOME:?RICERCACASA_HOME is required}/release.env
       ALLOWED_IMAGE_NAMESPACE: ${ALLOWED_IMAGE_NAMESPACE:-ghcr.io/joxdev12}
       COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-ricercacasa}
-      BACKEND_PORT: ${BACKEND_PORT:-3000}
       APP_PUBLIC_ORIGIN: http://127.0.0.1:${APP_PORT:-8080}
-      BACKEND_INTERNAL_URL: ${BOOTSTRAP_BACKEND_INTERNAL_URL:-http://host.docker.internal:${BACKEND_PORT:-3000}}
+      BACKEND_INTERNAL_URL: http://backend:3000
       HOST_UID: ${HOST_UID:-1000}
       HOST_GID: ${HOST_GID:-1000}
-    extra_hosts:
-      - host.docker.internal:host-gateway
+      RICERCACASA_CONTROL_NETWORK: ${RICERCACASA_CONTROL_NETWORK:-ricercacasa-control}
+    networks: [control]
     volumes:
       - ${RICERCACASA_HOME:?RICERCACASA_HOME is required}:${RICERCACASA_HOME:?RICERCACASA_HOME is required}
       - /var/run/docker.sock:/var/run/docker.sock
+
+networks:
+  control:
+    name: ${RICERCACASA_CONTROL_NETWORK:-ricercacasa-control}

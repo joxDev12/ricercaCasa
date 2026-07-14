@@ -39,7 +39,6 @@ services:
   backend:
     image: ghcr.io/joxdev12/ricercacasa-backend:3.0.0
     restart: unless-stopped
-    ports: ["127.0.0.1:${BACKEND_PORT:-3000}:3000"]
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -57,7 +56,10 @@ services:
     secrets: [postgres_password, app_secret, setup_token]
     depends_on:
       migrate: {condition: service_completed_successfully}
-    networks: [internal]
+    networks:
+      internal: {}
+      control:
+        aliases: [backend]
     healthcheck:
       test: ["CMD", "node", "./scripts/healthcheck.js", "ready"]
       interval: 10s
@@ -95,10 +97,10 @@ services:
       RELEASE_ENV_PATH: ${RICERCACASA_HOME:?RICERCACASA_HOME is required}/release.env
       ALLOWED_IMAGE_NAMESPACE: ${ALLOWED_IMAGE_NAMESPACE:-ghcr.io/joxdev12}
       COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-ricercacasa}
-      BACKEND_PORT: ${BACKEND_PORT:-3000}
       SETUP_TOKEN_FILE: /run/secrets/setup_token
       HOST_UID: ${HOST_UID:-1000}
       HOST_GID: ${HOST_GID:-1000}
+      RICERCACASA_CONTROL_NETWORK: ${RICERCACASA_CONTROL_NETWORK:-ricercacasa-control}
     secrets: [setup_token]
     volumes:
       - updater_data:/state
@@ -107,7 +109,7 @@ services:
       - ${RICERCACASA_HOME:?RICERCACASA_HOME is required}:${RICERCACASA_HOME:?RICERCACASA_HOME is required}
     depends_on:
       backend: {condition: service_healthy}
-    networks: [internal]
+    networks: [control]
     healthcheck:
       test: ["CMD", "node", "./scripts/healthcheck.js"]
       interval: 10s
@@ -116,6 +118,9 @@ services:
 
 networks:
   internal: {driver: bridge}
+  control:
+    external: true
+    name: ${RICERCACASA_CONTROL_NETWORK:-ricercacasa-control}
 
 volumes:
   postgres_data:

@@ -25,7 +25,7 @@ async function execute(job) {
         const runCompose = (args) => docker.compose(args, { onLine: (line) => store.appendLog(job.jobId, line) });
         if (phase === "pulling_images") await runCompose(["pull"]);
         if (phase === "starting_database") await runCompose(["up", "-d", "database"]);
-        if (phase === "running_migrations") await runCompose(["run", "--rm", "migrate"]);
+        if (phase === "running_migrations") await runCompose(["up", "-d", "migrate"]);
         if (phase === "starting_backend") await runCompose(["up", "-d", "backend"]);
         if (phase === "starting_frontend") await runCompose(["up", "-d", "frontend"]);
       }

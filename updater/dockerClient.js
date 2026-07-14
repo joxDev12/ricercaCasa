@@ -18,7 +18,7 @@ function run(command, args, { cwd, env, onLine } = {}) {
 
 function createDockerClient(config) {
   const composeArgs = (args) => ["compose", "-p", config.composeProjectName, "--env-file", config.releaseEnvPath, "-f", config.composeFilePath, ...args];
-  const composeOptions = (options = {}) => ({ ...options, env: { ...process.env, RICERCACASA_HOME: config.installationDir, BACKEND_PORT: config.backendPort, ALLOWED_IMAGE_NAMESPACE: config.allowedImageNamespace || process.env.ALLOWED_IMAGE_NAMESPACE || "ghcr.io/joxdev12" } });
+  const composeOptions = (options = {}) => ({ ...options, env: { ...process.env, RICERCACASA_HOME: config.installationDir, BACKEND_PORT: config.backendPort, RICERCACASA_CONTROL_NETWORK: process.env.RICERCACASA_CONTROL_NETWORK || "ricercacasa-control", ALLOWED_IMAGE_NAMESPACE: config.allowedImageNamespace || process.env.ALLOWED_IMAGE_NAMESPACE || "ghcr.io/joxdev12" } });
   return {
     info(options = {}) { return run("docker", ["info"], options); },
     composeVersion(options = {}) { return run("docker", ["compose", "version"], options); },
