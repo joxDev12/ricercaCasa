@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useFavoritesContext } from '../../../context/useFavoritesContext'
 import {
+  deletePropertyApi,
   deleteFavoriteApi,
   listFavoritesApi,
   saveFavoriteApi,
@@ -17,8 +18,10 @@ export function useFavorites() {
   const [loading, setLoading] = useState(false)
 
   async function saveFavorite(listing: ListingSummary) {
-    const key = `${listing.provider}:${listing.externalId}`
-    setSavingKey(key, true)
+    const variantKeys = (listing.variants.length ? listing.variants : [listing]).map(
+      (variant) => `${variant.provider}:${variant.externalId}`,
+    )
+    variantKeys.forEach((key) => setSavingKey(key, true))
     setError(null)
 
     try {
@@ -29,7 +32,7 @@ export function useFavorites() {
       setError(caught instanceof Error ? caught.message : 'Salvataggio fallito')
       throw caught
     } finally {
-      setSavingKey(key, false)
+      variantKeys.forEach((key) => setSavingKey(key, false))
     }
   }
 
@@ -47,12 +50,16 @@ export function useFavorites() {
     }
   }
 
-  async function removeFavorite(id: number) {
+  async function removeFavorite(id: number, mode: 'listing' | 'property' = 'property') {
     setLoading(true)
     setError(null)
 
     try {
-      await deleteFavoriteApi(id)
+      if (mode === 'listing') {
+        await deleteFavoriteApi(id)
+      } else {
+        await deletePropertyApi(id)
+      }
       await refreshSavedIds()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Eliminazione fallita')

@@ -12,6 +12,8 @@ test("normalizes a search result for persistence", () => {
     pricePeriod: "total",
     currency: "EUR",
     locationLabel: "Senigallia",
+    latitude: 43719754,
+    longitude: 92346,
     mainImageUrl: "https://pwm.im-cdn.it/image/1926675006/xxs-c.jpg",
   });
 
@@ -19,4 +21,6 @@ test("normalizes a search result for persistence", () => {
   assert.equal(result.price, 240000);
   assert.equal(result.images.length, 1);
   assert.equal(result.images[0].isPrimary, true);
+  assert.equal(result.latitude, null);
+  assert.equal(result.longitude, null);
 });

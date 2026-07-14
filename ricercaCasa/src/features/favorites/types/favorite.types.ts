@@ -1,35 +1,40 @@
-import type { ListingSummary, TransactionType } from '../../search/types/search.types'
+import type {
+  ProviderCode,
+  TransactionType,
+} from '../../search/types/search.types'
+import type {
+  ManagedPropertyDetails,
+  ManagementStatus,
+} from '../../listing-management/types/listingManagement.types'
 
-export type FavoriteListItem = Omit<ListingSummary, 'shortDescription'> & {
+export type FavoriteListItem = {
   id: number
+  propertyGroupId: number
+  provider: ProviderCode
+  externalId: string
+  sourceUrl: string
+  title: string
+  transactionType: TransactionType
+  propertyType: string | null
+  price: number | null
+  pricePeriod: 'month' | 'week' | 'day' | 'total' | null
+  currency: string
+  surfaceM2: number | null
+  rooms: number | null
+  floor: string | null
+  locationLabel: string | null
+  mainImageUrl: string | null
+  advertiserName: string | null
+  advertiserType: string | null
   savedAt: string
+  managementStatus: ManagementStatus
+  sourceCount: number
+  providers: ProviderCode[]
+  noteCount: number
+  nextAppointmentAt: string | null
 }
 
-export type FavoriteImage = {
-  imageUrl: string
-  altText: string | null
-  position: number
-  isPrimary: boolean
-}
-
-export type FavoriteDetails = FavoriteListItem & {
-  description?: string | null
-  bedrooms?: number | null
-  bathrooms?: number | null
-  address?: string | null
-  municipality?: string | null
-  province?: string | null
-  region?: string | null
-  postalCode?: string | null
-  latitude?: number | null
-  longitude?: number | null
-  locationPrecision?: string | null
-  features?: Record<string, unknown>
-  rawData?: Record<string, unknown>
-  images: FavoriteImage[]
-  updated_at?: string
-  created_at?: string
-}
+export type FavoriteDetails = ManagedPropertyDetails
 
 export type FavoritesFilters = {
   page?: number
@@ -37,7 +42,10 @@ export type FavoritesFilters = {
   transactionType?: TransactionType | ''
   maxPrice?: number | null
   location?: string
-  sort?: 'saved_at_desc' | 'price_asc' | 'price_desc'
+  provider?: ProviderCode | ''
+  managementStatus?: ManagementStatus | ''
+  hasFutureAppointment?: boolean
+  sort?: 'saved_at_desc' | 'price_asc' | 'price_desc' | 'appointment_asc'
 }
 
 export type FavoritesResponse = {

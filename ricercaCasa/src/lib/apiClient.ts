@@ -1,7 +1,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 type RequestOptions = RequestInit & {
-  query?: Record<string, string | number | null | undefined>
+  query?: Record<string, string | number | boolean | null | undefined>
 }
 
 function buildUrl(path: string, query?: RequestOptions['query']) {

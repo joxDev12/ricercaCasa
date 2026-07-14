@@ -52,6 +52,7 @@ export function usePropertySearch() {
   function reset() {
     setCriteria({
       ...criteria,
+      providers: criteria.providers,
       location: '',
       locationPath: null,
       maxPrice: null,

@@ -5,7 +5,9 @@ const {
   normalizeLocationSuggestions,
   parseSearchHtml,
   parseSearchMarkdown,
+  parseDetailsFromNextData,
 } = require("../scraper/immobiliareItScraper");
+const { loadHtml } = require("../scraper/shared/parsing");
 
 const criteria = {
   location: "Senigallia",
@@ -179,7 +181,10 @@ test("normalizes city, neighborhood and road suggestions", () => {
       type: 6,
       label: "Vomero",
       keyurl: "vomero",
-      parents: [{ id: "5685", type: 2, label: "Napoli", keyurl: "Napoli" }],
+      parents: [
+        { id: "5685", type: 2, label: "Napoli", keyurl: "Napoli" },
+        { id: "NA", type: 1, label: "Napoli", keyurl: "Napoli" },
+      ],
     },
   ];
 
@@ -192,6 +197,7 @@ test("normalizes city, neighborhood and road suggestions", () => {
   assert.equal(suggestions[0].path, "napoli/in-viale-raffaello");
   assert.equal(suggestions[1].displayLabel, "Vomero, Napoli");
   assert.equal(suggestions[1].path, "napoli/vomero");
+  assert.equal(suggestions[1].providerPaths.idealista_it, "napoli-napoli");
   assert.equal(
     normalizeLocationSuggestions([], "Via Raffaello", { label: "Napoli" })[0]
       .path,
@@ -206,4 +212,56 @@ test("normalizes city, neighborhood and road suggestions", () => {
     }),
     /affitto-case\/napoli\/in-viale-raffaello\/$/
   );
+});
+
+test("parses rich Immobiliare.it Next.js listing details", () => {
+  const nextData = {
+    props: {
+      pageProps: {
+        detailData: {
+          realEstate: {
+            id: 130675120,
+            title: "Bilocale via Monte Nevoso 6, Milano",
+            contract: "rent",
+            price: { value: 950 },
+            advertiser: { agency: { displayName: "Magis", label: "agenzia" } },
+            properties: [{
+              isMain: true,
+              typologyGA4Translation: "Appartamento",
+              description: "Descrizione completa",
+              surface: "51 m²",
+              rooms: "2",
+              bedRoomsNumber: "1",
+              bathrooms: "1",
+              floor: { value: "Seminterrato, con ascensore" },
+              elevator: true,
+              condition: "Ristrutturato",
+              energy: { heatingType: "centralizzato", class: { name: "D" } },
+              costs: { condominiumExpenses: "€ 150/mese" },
+              location: {
+                address: "Via Monte Nevoso",
+                streetNumber: "6",
+                microzone: "Casoretto",
+                city: "Milano",
+                latitude: 45.4866,
+                longitude: 9.2346,
+              },
+              primaryFeatures: [{ name: "Arredato", isVisible: true }],
+              multimedia: { photos: [{ caption: "Salone", urls: { large: "https://example.test/1.jpg" } }] },
+            }],
+          },
+        },
+      },
+    },
+  };
+  const $ = loadHtml(`<script id="__NEXT_DATA__">${JSON.stringify(nextData)}</script>`);
+  const result = parseDetailsFromNextData($, "https://www.immobiliare.it/annunci/130675120/");
+
+  assert.equal(result.description, "Descrizione completa");
+  assert.equal(result.bathrooms, 1);
+  assert.equal(result.furnished, true);
+  assert.equal(result.condominiumFees, 150);
+  assert.equal(result.latitude, 45.4866);
+  assert.equal(result.longitude, 9.2346);
+  assert.equal(result.images.length, 1);
 });

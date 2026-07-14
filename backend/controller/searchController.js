@@ -14,7 +14,7 @@ async function locations(req, res, next) {
     const data = await propertySearchService.suggestLocations(req.query.q, {
       label: req.query.contextLabel || null,
       path: req.query.contextPath || null,
-    });
+    }, req.query.providers ? String(req.query.providers).split(",") : []);
     res.json({ data });
   } catch (error) {
     next(error);

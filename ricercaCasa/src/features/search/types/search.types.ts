@@ -1,9 +1,16 @@
+export type ProviderCode = 'immobiliare_it' | 'idealista_it' | 'casa_it'
 export type TransactionType = 'rent' | 'sale'
 
+export type ProviderContext = {
+  locationPath?: string | null
+}
+
 export type SearchCriteria = {
-  provider: 'immobiliare_it'
+  providers: ProviderCode[]
   location: string
   locationPath: string | null
+  providerContexts?: Partial<Record<ProviderCode, ProviderContext>>
+  pagination?: Partial<Record<ProviderCode, number>>
   transactionType: TransactionType
   maxPrice: number | null
   page: number
@@ -15,10 +22,11 @@ export type LocationSuggestion = {
   label: string
   displayLabel: string
   path: string
+  providerPaths?: Partial<Record<ProviderCode, string>>
 }
 
-export type ListingSummary = {
-  provider: 'immobiliare_it'
+export type SearchVariant = {
+  provider: ProviderCode
   externalId: string
   sourceUrl: string
   title: string
@@ -37,10 +45,29 @@ export type ListingSummary = {
   advertiserType: string | null
 }
 
+export type ListingSummary = SearchVariant & {
+  variants: SearchVariant[]
+  sourceCount: number
+  providers: ProviderCode[]
+  possibleDuplicate: boolean
+}
+
+export type SearchProviderMeta = {
+  status: 'success' | 'failed'
+  count?: number
+  page?: number
+  hasNextPage?: boolean
+  totalResults?: number | null
+  code?: string
+  message?: string
+}
+
 export type SearchMeta = {
   page: number
   hasNextPage: boolean
   totalResults: number | null
+  providers: Partial<Record<ProviderCode, SearchProviderMeta>>
+  warnings: string[]
 }
 
 export type SearchResponse = {

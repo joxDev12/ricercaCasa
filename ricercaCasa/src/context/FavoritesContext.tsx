@@ -1,5 +1,5 @@
 import { createContext, useEffect, useState, type PropsWithChildren } from 'react'
-import { listFavoritesApi } from '../features/favorites/services/favoritesApi'
+import { listSavedKeysApi } from '../features/favorites/services/favoritesApi'
 
 type FavoritesContextValue = {
   refreshSavedIds: () => Promise<void>
@@ -18,7 +18,7 @@ export function FavoritesProvider({ children }: PropsWithChildren) {
 
   async function refreshSavedIds() {
     try {
-      const response = await listFavoritesApi({ limit: 50, page: 1 })
+      const response = await listSavedKeysApi()
       setSavedKeys(
         new Set(response.data.map((item) => `${item.provider}:${item.externalId}`)),
       )

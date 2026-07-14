@@ -5,8 +5,8 @@ import { SearchIcon, HeartIcon } from '../ui/Icons'
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
     isActive
-      ? 'border-blue-200 bg-blue-50 text-blue-600'
-      : 'border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+      ? 'border-blue-600 bg-blue-600 text-white shadow-[0_8px_20px_-10px_rgba(37,99,235,0.8)]'
+      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
   }`
 
 export function Header() {

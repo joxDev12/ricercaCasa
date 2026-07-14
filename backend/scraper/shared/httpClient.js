@@ -8,6 +8,7 @@ const {
 async function fetchHtml(url) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), env.scrapeTimeoutMs);
+  const hostname = new URL(String(url)).hostname.replace(/^www\./, "");
 
   try {
     const response = await fetch(url, {
@@ -25,7 +26,7 @@ async function fetchHtml(url) {
       /captcha-delivery|Please enable JS and disable any ad blocker/i.test(html)
     ) {
       throw new ProviderBlockedError(
-        "Immobiliare.it sta bloccando richieste automatiche con challenge anti-bot"
+        `${hostname} sta bloccando richieste automatiche con challenge anti-bot`
       );
     }
 
@@ -92,8 +93,9 @@ async function fetchReader(url) {
 
 async function fetchTranslatedHtml(url) {
   const source = new URL(url);
+  const translatedHostname = source.hostname.replace(/\./g, "-");
   const translated = new URL(
-    `https://www-immobiliare-it.translate.goog${source.pathname}`
+    `https://${translatedHostname}.translate.goog${source.pathname}`
   );
 
   source.searchParams.forEach((value, key) => {

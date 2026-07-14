@@ -13,6 +13,7 @@ const { flattenJsonLd, loadHtml, parseJsonLd } = require("./shared/parsing");
 const {
   extractExternalIdFromUrl,
   normalizeImage,
+  parseCoordinate,
   parseNumber,
   pickFirst,
   slugifyLocation,
@@ -52,9 +53,16 @@ function normalizeLocationSuggestions(items, query, context = {}) {
   const normalized = items.map((item) => {
     const parents = Array.isArray(item.parents) ? item.parents : [];
     const city = item.type === 2 ? item : parents.find((parent) => parent.type === 2);
+    const province =
+      item.type === 1 ? item : parents.find((parent) => parent.type === 1);
     const path = city && item.type > 2
       ? `${slugifyLocation(city.keyurl)}/${slugifyLocation(item.keyurl)}`
       : slugifyLocation(item.keyurl || item.label);
+    const idealistaPath = city && province
+      ? `${slugifyLocation(city.keyurl)}-${slugifyLocation(province.keyurl)}`
+      : province
+        ? `${slugifyLocation(province.keyurl)}-provincia`
+        : null;
     const labels = [item.label, city?.label]
       .filter(Boolean)
       .filter((value, index, values) => values.indexOf(value) === index);
@@ -65,6 +73,10 @@ function normalizeLocationSuggestions(items, query, context = {}) {
       label: item.label,
       displayLabel: labels.join(", "),
       path,
+      providerPaths: {
+        immobiliare_it: path,
+        ...(idealistaPath ? { idealista_it: idealistaPath } : {}),
+      },
       cityLabel: city?.label || null,
     };
   });
@@ -96,6 +108,7 @@ function normalizeLocationSuggestions(items, query, context = {}) {
         label: roadLabel,
         displayLabel: `${roadLabel}, ${contextCityLabel}`,
         path: `${contextPath.split("/")[0]}/in-${slugifyLocation(roadLabel)}`,
+        providerPaths: matchedPlace?.providerPaths || null,
         cityLabel: contextCityLabel || null,
       }
     : null;
@@ -589,8 +602,8 @@ function parseDetailsFromJsonLd(item, sourceUrl) {
     province: address.addressRegion || null,
     region: address.addressRegion || null,
     postalCode: address.postalCode || null,
-    latitude: parseNumber(geo.latitude),
-    longitude: parseNumber(geo.longitude),
+    latitude: parseCoordinate(geo.latitude, 90),
+    longitude: parseCoordinate(geo.longitude, 180),
     locationPrecision: geo.latitude && geo.longitude ? "approximate" : "unknown",
     mainImageUrl: images[0]?.imageUrl || null,
     images,
@@ -601,13 +614,139 @@ function parseDetailsFromJsonLd(item, sourceUrl) {
   };
 }
 
+function scalarValue(value) {
+  if (value == null || typeof value !== "object") return value ?? null;
+  return pickFirst(value.label, value.value, value.name);
+}
+
+function timestampValue(value) {
+  if (!value) return null;
+  if (typeof value === "number") return new Date(value * 1000).toISOString();
+  return value;
+}
+
+function parseDetailsFromNextData($, sourceUrl) {
+  const raw = $("#__NEXT_DATA__").contents().text().trim();
+  if (!raw) return null;
+
+  let detailData;
+
+  try {
+    detailData = JSON.parse(raw)?.props?.pageProps?.detailData;
+  } catch (_error) {
+    return null;
+  }
+
+  const listing = detailData?.realEstate;
+  const properties = Array.isArray(listing?.properties) ? listing.properties : [];
+  const property = properties.find((item) => item.isMain) || properties[0];
+
+  if (!listing?.id || !property) return null;
+
+  const location = property.location || {};
+  const photos = property.multimedia?.photos || [];
+  const images = photos
+    .map((photo, position) => {
+      const imageUrl = pickFirst(photo.urls?.large, photo.urls?.medium, photo.urls?.small);
+      return imageUrl
+        ? {
+            imageUrl,
+            altText: photo.caption || photo.tag?.label || null,
+            position,
+            isPrimary: position === 0,
+          }
+        : null;
+    })
+    .filter(Boolean);
+  const advertiser = Object.values(listing.advertiser || {}).find(
+    (item) => item && typeof item === "object" && item.displayName
+  );
+  const visibleFeatures = (property.primaryFeatures || [])
+    .filter((feature) => feature.isVisible)
+    .map((feature) => feature.name)
+    .filter(Boolean);
+  const mainFeatures = property.mainFeatures || [];
+  const hasFurniture =
+    visibleFeatures.some((feature) => /arredat/i.test(feature)) ||
+    mainFeatures.some((feature) => feature.type === "furniture");
+  const address = [location.address, location.streetNumber].filter(Boolean).join(" ") || null;
+  const transactionType = listing.contract === "rent" ? "rent" : "sale";
+
+  return {
+    provider: "immobiliare_it",
+    externalId: String(listing.id),
+    sourceUrl,
+    transactionType,
+    propertyType: pickFirst(
+      property.typologyGA4Translation,
+      property.typology?.name,
+      listing.typology?.name
+    ),
+    title: listing.title || detailData.seo?.title || `Annuncio ${listing.id}`,
+    description: pickFirst(property.description, property.caption),
+    price: parseNumber(pickFirst(listing.price?.value, property.price?.value)),
+    pricePeriod: transactionType === "rent" ? "month" : "total",
+    currency: "EUR",
+    surfaceM2: parseNumber(property.surface),
+    rooms: parseNumber(property.rooms),
+    bedrooms: parseNumber(property.bedRoomsNumber),
+    bathrooms: parseNumber(property.bathrooms),
+    floor: scalarValue(property.floor?.value || property.floor),
+    totalFloors: parseNumber(property.floors),
+    elevator: property.elevator ?? null,
+    furnished: hasFurniture || null,
+    propertyCondition: scalarValue(pickFirst(property.condition, property.ga4Condition)),
+    heating: pickFirst(property.energy?.heatingType, property.ga4Heating),
+    energyClass: property.energy?.class?.name || null,
+    condominiumFees: parseNumber(property.costs?.condominiumExpenses),
+    availability: scalarValue(property.availability),
+    advertiserName: advertiser?.displayName || null,
+    advertiserType: advertiser?.label || advertiser?.type || null,
+    locationLabel:
+      [address, location.microzone || location.macrozone, location.city]
+        .filter(Boolean)
+        .filter((value, index, values) => values.indexOf(value) === index)
+        .join(", ") || null,
+    address,
+    street: location.address || null,
+    civicNumber: location.streetNumber || null,
+    district: location.microzone || location.macrozone || null,
+    municipality: location.city || null,
+    province: location.province || null,
+    region: location.region || null,
+    postalCode: location.postalCode || null,
+    latitude: parseCoordinate(location.latitude, 90),
+    longitude: parseCoordinate(location.longitude, 180),
+    locationPrecision: location.latitude && location.longitude ? "approximate" : "unknown",
+    mainImageUrl: images[0]?.imageUrl || property.photo?.urls?.large || null,
+    images,
+    features: { items: visibleFeatures },
+    rawData: { source: "next_data", listingId: String(listing.id) },
+    sourcePublishedAt: timestampValue(listing.createdAt),
+    sourceUpdatedAt: timestampValue(listing.updatedAt),
+  };
+}
+
 async function getDetails(sourceUrl) {
   if (!env.allowProviderScraping) {
     throw new ProviderBlockedError();
   }
 
-  const html = await fetchHtml(sourceUrl);
+  let html;
+
+  try {
+    html = await fetchHtml(sourceUrl);
+  } catch (_error) {
+    html = await fetchTranslatedHtml(sourceUrl);
+  }
+
   const $ = loadHtml(html);
+  const nextDetails = parseDetailsFromNextData($, sourceUrl);
+
+  if (nextDetails) {
+    return nextDetails;
+  }
+
   const jsonLd = flattenJsonLd(parseJsonLd($));
   const detailNode = jsonLd.find(
     (item) =>
@@ -632,10 +771,15 @@ async function getDetails(sourceUrl) {
 
 module.exports = {
   buildSearchUrl,
+  code: "immobiliare_it",
+  extractExternalId: extractExternalIdFromUrl,
   getDetails,
   normalizeLocationSuggestions,
+  parseDetailsFromNextData,
   parseSearchHtml,
   parseSearchMarkdown,
   search,
   suggestLocations,
+  validateSourceUrl: (sourceUrl) =>
+    /^https:\/\/www\.immobiliare\.it\/annunci\/\d+\/?$/i.test(String(sourceUrl)),
 };

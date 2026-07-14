@@ -7,6 +7,8 @@ const { errorHandler } = require("./middleware/errorHandler");
 const { notFound } = require("./middleware/notFound");
 const { apiRateLimiter } = require("./middleware/rateLimiter");
 const favoritesRoutes = require("./routes/favoritesRoutes");
+const duplicateCandidatesRoutes = require("./routes/duplicateCandidatesRoutes");
+const providersRoutes = require("./routes/providersRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 
 const app = express();
@@ -30,7 +32,9 @@ app.get("/health", async (_req, res, next) => {
 });
 
 app.use("/api/search", searchRoutes);
+app.use("/api/providers", providersRoutes);
 app.use("/api/favorites", favoritesRoutes);
+app.use("/api/duplicate-candidates", duplicateCandidatesRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

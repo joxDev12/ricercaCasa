@@ -2,13 +2,14 @@ import { useEffect, useState, type KeyboardEvent } from 'react'
 import { MapPinIcon } from '../../../components/ui/Icons'
 import { Input } from '../../../components/ui/Input'
 import { locationSuggestionsApi } from '../services/searchApi'
-import type { LocationSuggestion } from '../types/search.types'
+import type { LocationSuggestion, ProviderCode } from '../types/search.types'
 
 type LocationAutocompleteProps = {
   contextLabel?: string
   contextPath?: string | null
   onChange: (value: string) => void
   onSelect: (suggestion: LocationSuggestion) => void
+  providers: ProviderCode[]
   selectedPath: string | null
   value: string
 }
@@ -27,6 +28,7 @@ export function LocationAutocomplete({
   contextPath,
   onChange,
   onSelect,
+  providers,
   selectedPath,
   value,
 }: LocationAutocompleteProps) {
@@ -50,6 +52,7 @@ export function LocationAutocomplete({
         const response = await locationSuggestionsApi(query, controller.signal, {
           label: contextLabel,
           path: contextPath,
+          providers,
         })
         setSuggestions(response.data)
         setActiveIndex(0)
@@ -68,7 +71,7 @@ export function LocationAutocomplete({
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [contextLabel, contextPath, focused, selectedPath, value])
+  }, [contextLabel, contextPath, focused, providers, selectedPath, value])
 
   function selectSuggestion(suggestion: LocationSuggestion) {
     onSelect(suggestion)

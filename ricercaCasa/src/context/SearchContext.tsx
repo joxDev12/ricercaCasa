@@ -7,6 +7,7 @@ import {
 } from 'react'
 import type {
   ListingSummary,
+  ProviderCode,
   SearchCriteria,
   SearchMeta,
 } from '../features/search/types/search.types'
@@ -24,7 +25,7 @@ type SearchContextValue = {
 }
 
 const defaultCriteria: SearchCriteria = {
-  provider: 'immobiliare_it',
+  providers: ['immobiliare_it', 'idealista_it', 'casa_it'],
   location: '',
   locationPath: null,
   transactionType: 'sale',
@@ -32,7 +33,7 @@ const defaultCriteria: SearchCriteria = {
   page: 1,
 }
 
-const STORAGE_KEY = 'ricercaCasa.searchState.v1'
+const STORAGE_KEY = 'ricercaCasa.searchState.v2'
 
 function readPersistedState() {
   if (typeof window === 'undefined') {
@@ -60,10 +61,24 @@ const SearchContext = createContext<SearchContextValue | null>(null)
 
 export function SearchProvider({ children }: PropsWithChildren) {
   const persisted = readPersistedState()
+  const normalizedCriteria = persisted?.criteria
+    ? {
+        ...defaultCriteria,
+        ...persisted.criteria,
+        providers:
+          persisted.criteria.providers?.length
+            ? persisted.criteria.providers
+            : (persisted.criteria as SearchCriteria & { provider?: ProviderCode }).provider
+              ? [
+                  (persisted.criteria as SearchCriteria & {
+                    provider?: ProviderCode
+                  }).provider as ProviderCode,
+                ]
+            : defaultCriteria.providers,
+      }
+    : defaultCriteria
   const [criteria, setCriteria] = useState(
-    persisted?.criteria
-      ? { ...defaultCriteria, ...persisted.criteria }
-      : defaultCriteria,
+    normalizedCriteria,
   )
   const [results, setResults] = useState<ListingSummary[]>(
     persisted?.results ?? [],

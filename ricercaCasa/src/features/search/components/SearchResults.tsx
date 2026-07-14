@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Button } from '../../../components/ui/Button'
 import { ListIcon } from '../../../components/ui/Icons'
+import { ViewModeToggle, type ViewMode } from '../../../components/ui/ViewModeToggle'
 import { EmptyState } from '../../../components/feedback/EmptyState'
 import { ErrorMessage } from '../../../components/feedback/ErrorMessage'
 import { LoadingGrid } from '../../../components/feedback/LoadingGrid'
@@ -8,6 +10,7 @@ import { SearchResultCard } from './SearchResultCard'
 
 export function SearchResults() {
   const { error, loadMore, loading, meta, results } = usePropertySearch()
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
 
   if (loading && results.length === 0) {
     return <LoadingGrid />
@@ -29,6 +32,9 @@ export function SearchResults() {
   return (
     <section className="space-y-6 pt-4">
       {error ? <ErrorMessage message={error} /> : null}
+      {meta?.warnings?.length ? (
+        <ErrorMessage message={meta.warnings.join(' • ')} />
+      ) : null}
 
       <div className="flex flex-col gap-3 border-t border-slate-200 pt-10 md:flex-row md:items-end md:justify-between">
         <div className="space-y-2">
@@ -38,17 +44,24 @@ export function SearchResults() {
           </p>
           <p className="text-sm text-slate-500">
             Pagina {meta?.page ?? 1}
-            {meta?.totalResults ? ` • ${meta.totalResults} annunci letti` : ''}
+            {meta?.totalResults ? ` • ${meta.totalResults} gruppi annuncio` : ''}
           </p>
         </div>
-        <p className="text-sm text-slate-500">
-          Salva solo annunci che vuoi tenere nel database locale.
-        </p>
+        <div className="flex flex-wrap items-center gap-4">
+          <p className="text-sm text-slate-500">
+            Salva solo immobili che vuoi tenere nel database locale.
+          </p>
+          <ViewModeToggle onChange={setViewMode} value={viewMode} />
+        </div>
       </div>
 
-      <div className="space-y-4">
+      <div className={viewMode === 'grid' ? 'grid gap-5 md:grid-cols-2 xl:grid-cols-3' : 'space-y-4'}>
         {results.map((listing) => (
-          <SearchResultCard key={listing.externalId} listing={listing} />
+          <SearchResultCard
+            compact={viewMode === 'grid'}
+            key={listing.externalId}
+            listing={listing}
+          />
         ))}
       </div>
 

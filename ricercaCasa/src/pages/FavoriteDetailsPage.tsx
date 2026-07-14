@@ -1,43 +1,60 @@
-import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ErrorMessage } from '../components/feedback/ErrorMessage'
 import { LoadingGrid } from '../components/feedback/LoadingGrid'
 import { PageContainer } from '../components/layout/PageContainer'
+import { ArrowLeftIcon } from '../components/ui/Icons'
 import { FavoriteDetails } from '../features/favorites/components/FavoriteDetails'
-import { getFavoriteApi } from '../features/favorites/services/favoritesApi'
-import type { FavoriteDetails as FavoriteDetailsType } from '../features/favorites/types/favorite.types'
+import { useFavorites } from '../features/favorites/hooks/useFavorites'
+import { useDuplicateCandidates } from '../features/duplicates/hooks/useDuplicateCandidates'
+import { useListingManagement } from '../features/listing-management/hooks/useListingManagement'
 
 export function FavoriteDetailsPage() {
   const { id } = useParams()
-  const [favorite, setFavorite] = useState<FavoriteDetailsType | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!id) {
-      return
-    }
-
-    getFavoriteApi(Number(id))
-      .then((response) => setFavorite(response.data))
-      .catch((caught) =>
-        setError(caught instanceof Error ? caught.message : 'Caricamento fallito'),
-      )
-  }, [id])
+  const navigate = useNavigate()
+  const numericId = id ? Number(id) : null
+  const { removeFavorite } = useFavorites()
+  const {
+    details,
+    error,
+    loading,
+    refresh,
+    removeAppointment,
+    removeNote,
+    saveAppointment,
+    saveNote,
+    updateStatus,
+  } = useListingManagement(numericId)
+  const { decide } = useDuplicateCandidates(refresh)
 
   return (
     <PageContainer>
       <div className="mb-6">
         <Link
-          className="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50"
+          className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           to="/favorites"
         >
+          <ArrowLeftIcon className="h-4 w-4" />
           Torna ai preferiti
         </Link>
       </div>
 
       {error ? <ErrorMessage message={error} /> : null}
-      {!favorite && !error ? <LoadingGrid /> : null}
-      {favorite ? <FavoriteDetails favorite={favorite} /> : null}
+      {loading && !details ? <LoadingGrid /> : null}
+      {details ? (
+        <FavoriteDetails
+          favorite={details}
+          onAppointmentDelete={removeAppointment}
+          onAppointmentSave={saveAppointment}
+          onDeleteProperty={async () => {
+            await removeFavorite(details.id, 'property')
+            navigate('/favorites')
+          }}
+          onDuplicateDecision={decide}
+          onNoteDelete={removeNote}
+          onNoteSave={saveNote}
+          onStatusChange={updateStatus}
+        />
+      ) : null}
     </PageContainer>
   )
 }

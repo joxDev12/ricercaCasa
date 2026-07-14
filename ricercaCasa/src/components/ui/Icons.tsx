@@ -184,3 +184,136 @@ export function ListIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+export function GridIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={iconClassName(className)}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <rect height="6" rx="1" width="6" x="4" y="4" />
+      <rect height="6" rx="1" width="6" x="14" y="4" />
+      <rect height="6" rx="1" width="6" x="4" y="14" />
+      <rect height="6" rx="1" width="6" x="14" y="14" />
+    </svg>
+  )
+}
+
+export function ArrowLeftIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={iconClassName(className)}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="M19 12H5" />
+      <path d="m11 18-6-6 6-6" />
+    </svg>
+  )
+}
+
+export function ExternalLinkIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={iconClassName(className)}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="M14 5h5v5" />
+      <path d="m10 14 9-9" />
+      <path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" />
+    </svg>
+  )
+}
+
+export function CalendarIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={iconClassName(className)}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M16 3v4" />
+      <path d="M8 3v4" />
+      <path d="M3 10h18" />
+    </svg>
+  )
+}
+
+export function NoteIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={iconClassName(className)}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="M7 4h10a2 2 0 0 1 2 2v12l-4-2-4 2-4-2-2 1V6a2 2 0 0 1 2-2Z" />
+      <path d="M9 8h6" />
+      <path d="M9 11h6" />
+    </svg>
+  )
+}
+
+export function PencilIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={iconClassName(className)}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="m4 20 4.5-1 9-9a2.1 2.1 0 1 0-3-3l-9 9L4 20Z" />
+      <path d="m13.5 7.5 3 3" />
+    </svg>
+  )
+}
+
+export function TrashIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={iconClassName(className)}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="M4 7h16" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M6 7 7 19a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
+      <path d="M9 7V4h6v3" />
+    </svg>
+  )
+}

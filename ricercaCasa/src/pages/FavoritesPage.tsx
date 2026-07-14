@@ -5,6 +5,7 @@ import { PageContainer } from '../components/layout/PageContainer'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
+import { ViewModeToggle, type ViewMode } from '../components/ui/ViewModeToggle'
 import { FavoritesGrid } from '../features/favorites/components/FavoritesGrid'
 import { useFavorites } from '../features/favorites/hooks/useFavorites'
 import { listFavoritesApi } from '../features/favorites/services/favoritesApi'
@@ -26,6 +27,7 @@ export function FavoritesPage() {
   const { error, listFavorites, loading, removeFavorite } = useFavorites()
   const [favorites, setFavorites] = useState<FavoriteListItem[]>([])
   const [filters, setFilters] = useState(initialFilters)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
 
   async function loadFavorites(nextFilters: FavoritesFilters) {
     const response = await listFavorites(nextFilters)
@@ -108,6 +110,7 @@ export function FavoritesPage() {
             <option value="saved_at_desc">Ultimi salvati</option>
             <option value="price_asc">Prezzo crescente</option>
             <option value="price_desc">Prezzo decrescente</option>
+            <option value="appointment_asc">Prossimo appuntamento</option>
           </Select>
 
           <div className="flex items-end">
@@ -118,10 +121,17 @@ export function FavoritesPage() {
         </form>
 
         {error ? <ErrorMessage message={error} /> : null}
+        <div className="flex justify-end">
+          <ViewModeToggle onChange={setViewMode} value={viewMode} />
+        </div>
         {loading && !favorites.length ? (
           <LoadingGrid />
         ) : (
-          <FavoritesGrid favorites={favorites} onDelete={handleDelete} />
+          <FavoritesGrid
+            favorites={favorites}
+            onDelete={handleDelete}
+            viewMode={viewMode}
+          />
         )}
       </section>
     </PageContainer>

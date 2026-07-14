@@ -12,6 +12,10 @@ function parseNumber(value) {
     return null;
   }
 
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
   const normalized = String(value)
     .replace(/[^\d,.-]/g, "")
     .replace(/\./g, "")
@@ -23,6 +27,13 @@ function parseNumber(value) {
 
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseCoordinate(value, maxAbsoluteValue) {
+  const parsed = Number(String(value ?? "").replace(",", "."));
+  return Number.isFinite(parsed) && Math.abs(parsed) <= maxAbsoluteValue
+    ? parsed
+    : null;
 }
 
 function extractExternalIdFromUrl(sourceUrl) {
@@ -53,10 +64,19 @@ function normalizeImage(url, position = 0) {
   };
 }
 
+function pickTextMatches(value, query) {
+  const haystack = slugifyLocation(String(value || ""));
+  const needle = slugifyLocation(String(query || ""));
+
+  return Boolean(haystack && needle && haystack.includes(needle));
+}
+
 module.exports = {
   extractExternalIdFromUrl,
   normalizeImage,
+  parseCoordinate,
   parseNumber,
+  pickTextMatches,
   pickFirst,
   slugifyLocation,
 };

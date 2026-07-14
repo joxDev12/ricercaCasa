@@ -15,7 +15,11 @@ export function searchApi(criteria: SearchCriteria) {
 export function locationSuggestionsApi(
   query: string,
   signal: AbortSignal,
-  context: { label?: string; path?: string | null },
+  context: {
+    label?: string
+    path?: string | null
+    providers?: string[]
+  },
 ) {
   return apiClient<{ data: LocationSuggestion[] }>('/api/search/locations', {
     signal,
@@ -23,6 +27,7 @@ export function locationSuggestionsApi(
       q: query,
       contextLabel: context.label,
       contextPath: context.path,
+      providers: context.providers?.join(','),
     },
   })
 }

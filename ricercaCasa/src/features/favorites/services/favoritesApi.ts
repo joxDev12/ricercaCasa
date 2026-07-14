@@ -15,12 +15,22 @@ export function listFavoritesApi(filters: FavoritesFilters) {
   return apiClient<FavoritesResponse>('/api/favorites', { query: filters })
 }
 
+export function listSavedKeysApi() {
+  return apiClient<{ data: Array<{ provider: string; externalId: string }> }>(
+    '/api/favorites/keys',
+  )
+}
+
 export function getFavoriteApi(id: number) {
   return apiClient<{ data: FavoriteDetails }>(`/api/favorites/${id}`)
 }
 
 export function deleteFavoriteApi(id: number) {
   return apiClient<void>(`/api/favorites/${id}`, { method: 'DELETE' })
+}
+
+export function deletePropertyApi(id: number) {
+  return apiClient<void>(`/api/favorites/${id}/property`, { method: 'DELETE' })
 }
 
 export function saveFavoriteApi(listing: ListingSummary) {
