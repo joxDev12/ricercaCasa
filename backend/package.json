@@ -8,9 +8,9 @@
     "start": "node server.js",
     "test": "node --test",
     "db:create-migration": "node-pg-migrate create -m migrations",
-    "db:migrate": "node-pg-migrate up -m migrations",
-    "db:rollback": "node-pg-migrate down -m migrations",
-    "db:status": "node-pg-migrate status -m migrations"
+    "db:migrate": "node ./scripts/run-migrations.js up",
+    "db:rollback": "node ./scripts/run-migrations.js down",
+    "db:status": "node ./scripts/run-migrations.js status"
   },
   "keywords": [],
   "type": "commonjs",
