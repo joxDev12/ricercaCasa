@@ -132,20 +132,14 @@ assert_clean_generated_files() {
   fi
 }
 
-prepare_ci_secret_fixture() {
-  mkdir -p "$SECRETS_DIR"
-  printf 'smoke-postgres-password-%s\n' "$$" >"$SECRETS_DIR/postgres_password"
-  printf 'smoke-app-secret-%s\n' "$$" >"$SECRETS_DIR/app_secret"
-  printf 'smoke-setup-token-%s\n' "$$" >"$SECRETS_DIR/setup_token"
-  chmod 600 "$SECRETS_DIR/postgres_password" "$SECRETS_DIR/app_secret" "$SECRETS_DIR/setup_token"
-
-  docker run --rm \
-    -v "$SECRETS_DIR:/secrets" \
-    node:22-bookworm-slim \
-    sh -c 'chown 2001:2001 /secrets/postgres_password /secrets/app_secret /secrets/setup_token && chmod 600 /secrets/postgres_password /secrets/app_secret /secrets/setup_token'
-}
-
 assert_ci_secret_fixture() {
+  host_uid="$(id -u)"
+
+  if [ "$SMOKE_REQUIRE_SECRET_UID_MISMATCH" = "1" ] && [ "$host_uid" = "1000" ]; then
+    echo "Host UID $host_uid coincide con UID node 1000; impossibile verificare mismatch naturale secret" >&2
+    exit 1
+  fi
+
   for secret_name in postgres_password app_secret setup_token; do
     secret_path="$SECRETS_DIR/$secret_name"
     mode="$(stat -c '%a' "$secret_path")"
@@ -156,8 +150,13 @@ assert_ci_secret_fixture() {
       exit 1
     fi
 
+    if [ "$owner_uid" != "$host_uid" ]; then
+      echo "Secret owner inatteso: $secret_path owner=$owner_uid host=$host_uid" >&2
+      exit 1
+    fi
+
     if [ "$SMOKE_REQUIRE_SECRET_UID_MISMATCH" = "1" ] && [ "$owner_uid" = "1000" ]; then
-      echo "Secret owner coincide con UID node: $secret_path" >&2
+      echo "Secret owner coincide con UID node 1000: $secret_path" >&2
       exit 1
     fi
   done
@@ -198,7 +197,6 @@ trap print_failure_context ERR
 
 compose down -v --remove-orphans || true
 rm -rf "$DEPLOY_DIR/secrets" "$DEPLOY_DIR/state" "$DEPLOY_DIR/release.env"
-prepare_ci_secret_fixture
 
 "$DEPLOY_DIR/install.sh"
 assert_clean_generated_files
@@ -248,7 +246,6 @@ compose exec -T backend node -e "fetch('http://127.0.0.1:3000/api/settings').the
 
 compose down -v --remove-orphans
 rm -rf "$DEPLOY_DIR/secrets" "$DEPLOY_DIR/state" "$DEPLOY_DIR/release.env"
-prepare_ci_secret_fixture
 
 "$DEPLOY_DIR/install.sh"
 assert_clean_generated_files
