@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RicercaCasa release manifest",
+  "type": "object",
+  "required": [
+    "platformVersion",
+    "channel",
+    "minimumUpdaterVersion",
+    "composeSchemaVersion",
+    "images",
+    "database"
+  ],
+  "properties": {
+    "platformVersion": { "type": "string" },
+    "channel": { "type": "string" },
+    "minimumUpdaterVersion": { "type": "string" },
+    "composeSchemaVersion": { "type": "integer", "minimum": 1 },
+    "images": {
+      "type": "object",
+      "required": ["frontend", "backend", "updater"]
+    },
+    "database": {
+      "type": "object",
+      "required": ["migrationRequired", "minimumPostgresMajor", "maximumPostgresMajor"]
+    },
+    "configurationTasks": {
+      "type": "array"
+    },
+    "releaseNotesUrl": { "type": "string" }
+  }
+}

@@ -13,4 +13,8 @@ const connectionConfig = env.databaseUrl
 
 const pool = new Pool(connectionConfig);
 
-module.exports = { pool };
+async function closePool() {
+  await pool.end();
+}
+
+module.exports = { pool, closePool };

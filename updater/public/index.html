@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RicercaCasa Setup</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f7fb;
+        --card: #ffffff;
+        --line: #d8e1ee;
+        --text: #0f172a;
+        --muted: #64748b;
+        --accent: #2563eb;
+        --accent-2: #dbeafe;
+        --ok: #047857;
+        --warn: #b45309;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top, #dbeafe 0%, transparent 35%),
+          linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 40px 20px 72px;
+      }
+      .hero, .card {
+        background: color-mix(in srgb, var(--card) 92%, white);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        box-shadow: 0 24px 80px -40px rgba(15, 23, 42, 0.28);
+      }
+      .hero { padding: 32px; margin-bottom: 24px; }
+      .grid { display: grid; gap: 24px; grid-template-columns: 1.2fr .8fr; }
+      .card { padding: 24px; }
+      h1 { margin: 0 0 12px; font-size: clamp(2rem, 4vw, 3.6rem); line-height: .95; }
+      h2 { margin: 0 0 12px; font-size: 1.25rem; }
+      p { margin: 0; color: var(--muted); line-height: 1.6; }
+      .eyebrow {
+        margin-bottom: 12px;
+        color: var(--muted);
+        font-size: .75rem;
+        font-weight: 700;
+        letter-spacing: .24em;
+        text-transform: uppercase;
+      }
+      form { display: grid; gap: 16px; margin-top: 20px; }
+      label { display: grid; gap: 8px; font-weight: 600; font-size: .95rem; }
+      input, select {
+        height: 52px;
+        width: 100%;
+        padding: 0 16px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: white;
+        font: inherit;
+        color: var(--text);
+      }
+      .checkbox {
+        display: grid;
+        grid-template-columns: 20px 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: #f8fafc;
+      }
+      .checkbox input { height: 20px; margin: 0; }
+      button {
+        height: 52px;
+        border: 0;
+        border-radius: 18px;
+        background: var(--accent);
+        color: white;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:disabled { opacity: .6; cursor: not-allowed; }
+      .status {
+        display: grid;
+        gap: 12px;
+      }
+      .status-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: .78rem;
+        font-weight: 700;
+      }
+      .pill.ok { background: #dcfce7; color: var(--ok); }
+      .pill.warn { background: #ffedd5; color: var(--warn); }
+      .message {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: var(--accent-2);
+        color: #1d4ed8;
+        display: none;
+      }
+      .message.error {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .footer-link {
+        display: inline-flex;
+        margin-top: 16px;
+        color: var(--accent);
+        font-weight: 700;
+        text-decoration: none;
+      }
+      @media (max-width: 900px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div class="eyebrow">RicercaCasa V3</div>
+        <h1>Wizard locale installazione</h1>
+        <p>
+          Docker prepara stack. Qui completi dati utente, consenso scraper, stato setup.
+        </p>
+      </section>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Dati utente</h2>
+          <p>Database, secret, rete interna restano automatici. Qui solo dati comprensibili.</p>
+          <form id="setup-form">
+            <label>
+              Nome visualizzato
+              <input id="displayName" name="displayName" required maxlength="120" />
+            </label>
+
+            <label>
+              Email contatto
+              <input id="contactEmail" name="contactEmail" type="email" />
+            </label>
+
+            <label>
+              Lingua
+              <select id="locale" name="locale">
+                <option value="it-IT">Italiano</option>
+                <option value="en-GB">English</option>
+              </select>
+            </label>
+
+            <label>
+              Fuso orario
+              <input id="timezone" name="timezone" required />
+            </label>
+
+            <label class="checkbox">
+              <input id="scrapingConsent" name="scrapingConsent" type="checkbox" required />
+              <span>Confermo uso locale degli scraper. Provider esterni possono cambiare e rompere raccolta dati.</span>
+            </label>
+
+            <label class="checkbox">
+              <input id="confirmSetup" name="confirmSetup" type="checkbox" required />
+              <span>Confermo completamento setup iniziale.</span>
+            </label>
+
+            <button id="submit-button" type="submit">Completa setup</button>
+          </form>
+          <div id="message" class="message"></div>
+          <a class="footer-link" href="http://127.0.0.1:8080/" target="_blank" rel="noreferrer">
+            Apri dashboard
+          </a>
+        </section>
+
+        <aside class="card">
+          <h2>Stato updater</h2>
+          <div class="status" id="status"></div>
+        </aside>
+      </div>
+    </main>
+
+    <script>
+      const statusRoot = document.getElementById('status')
+      const message = document.getElementById('message')
+      const form = document.getElementById('setup-form')
+      const submitButton = document.getElementById('submit-button')
+      const timezoneInput = document.getElementById('timezone')
+
+      timezoneInput.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome'
+
+      function showMessage(text, type = 'info') {
+        message.textContent = text
+        message.className = `message ${type === 'error' ? 'error' : ''}`
+        message.style.display = 'block'
+      }
+
+      function renderStatus(items) {
+        statusRoot.innerHTML = ''
+        items.forEach((item) => {
+          const row = document.createElement('div')
+          row.className = 'status-item'
+          row.innerHTML = `
+            <div>
+              <strong>${item.label}</strong>
+              <p>${item.description}</p>
+            </div>
+            <span class="pill ${item.ok ? 'ok' : 'warn'}">${item.value}</span>
+          `
+          statusRoot.appendChild(row)
+        })
+      }
+
+      async function loadStatus() {
+        const [updaterStatusResponse, setupStatusResponse] = await Promise.all([
+          fetch('/updater/status'),
+          fetch('/updater/setup/status'),
+        ])
+
+        const updaterStatus = await updaterStatusResponse.json()
+        const setupStatus = await setupStatusResponse.json()
+        const installation = setupStatus.data?.installation
+        const completed = setupStatus.data?.completed === true
+
+        renderStatus([
+          {
+            label: 'Updater',
+            description: 'Versione container wizard/update.',
+            value: updaterStatus.data.updaterVersion,
+            ok: true,
+          },
+          {
+            label: 'Piattaforma',
+            description: 'Versione target frontend/backend.',
+            value: updaterStatus.data.platformVersion,
+            ok: true,
+          },
+          {
+            label: 'Setup token',
+            description: 'Bootstrap disponibile per setup iniziale.',
+            value: updaterStatus.data.hasSetupToken ? 'ok' : 'missing',
+            ok: updaterStatus.data.hasSetupToken,
+          },
+          {
+            label: 'Installazione',
+            description: 'Stato singleton `app_installation`.',
+            value: installation?.setupStatus || 'pending',
+            ok: !completed,
+          },
+        ])
+
+        if (completed) {
+          showMessage('Setup gia completato. Dashboard pronta.')
+          submitButton.disabled = true
+        }
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        submitButton.disabled = true
+        showMessage('Salvataggio setup in corso...')
+
+        const payload = {
+          displayName: document.getElementById('displayName').value,
+          contactEmail: document.getElementById('contactEmail').value,
+          locale: document.getElementById('locale').value,
+          timezone: document.getElementById('timezone').value,
+          scrapingConsent: document.getElementById('scrapingConsent').checked,
+          confirmSetup: document.getElementById('confirmSetup').checked,
+        }
+
+        try {
+          const response = await fetch('/updater/setup/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+
+          const data = await response.json()
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Setup fallito')
+          }
+
+          showMessage('Setup completato. Ora puoi aprire dashboard.')
+          await loadStatus()
+        } catch (error) {
+          showMessage(error.message || 'Setup fallito', 'error')
+          submitButton.disabled = false
+        }
+      })
+
+      loadStatus().catch((error) => {
+        showMessage(error.message || 'Caricamento stato fallito', 'error')
+      })
+    </script>
+  </body>
+</html>

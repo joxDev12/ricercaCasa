@@ -1,0 +1,85 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: ricercacasa
+          POSTGRES_USER: ricercacasa
+          POSTGRES_PASSWORD: ricercacasa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ricercacasa -d ricercacasa"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_NAME: ricercacasa
+      DB_USER: ricercacasa
+      DB_PASS: ricercacasa
+      APP_SECRET: test-secret
+      SETUP_TOKEN: test-setup-token
+      PLATFORM_VERSION: 3.0.0
+      UPDATER_VERSION: 1.0.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run db:migrate
+      - run: npm run db:status
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ricercaCasa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ricercaCasa/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  updater:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test updater/tests/*.test.js
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, updater]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -t ricercacasa-backend:test ./backend
+      - name: Build frontend image
+        run: docker build -t ricercacasa-frontend:test ./ricercaCasa
+      - name: Build updater image
+        run: docker build -t ricercacasa-updater:test ./updater
