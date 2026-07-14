@@ -87,7 +87,7 @@ wait_service_running() {
   attempts="${2:-60}"
 
   while [ "$attempts" -gt 0 ]; do
-    if [ "$(compose ps --status running --services | rg "^${service}$" || true)" = "$service" ]; then
+    if compose ps --status running --services | grep -Fxq "$service"; then
       return 0
     fi
 
@@ -109,7 +109,6 @@ assert_clean_generated_files() {
 
 need_cmd docker
 need_cmd curl
-need_cmd rg
 need_cmd python3
 require_confirmation
 trap print_failure_context ERR
