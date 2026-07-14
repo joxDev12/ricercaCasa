@@ -14,17 +14,21 @@ wait_http() {
   for _ in {1..60}; do curl -fsS "$url" >/dev/null && return 0; sleep 2; done
   return 1
 }
+fail() { echo "$1" >&2; return 1; }
 
 registry_name="ricercacasa-smoke-registry-$$"
 registry_port="${UPDATER_SMOKE_REGISTRY_PORT:-5501}"
 project="ricercacasa-smoke-$$"
 backend_port="${UPDATER_SMOKE_BACKEND_PORT:-$((13000 + $$ % 1000))}"
 home_dir="$(mktemp -d "$PWD/.updater-smoke.XXXXXX")"
+last_body_file="$home_dir/last-response.body"
+last_body=""
 registry="127.0.0.1:${registry_port}"
 control_network="${project}-control"
 
 cleanup() {
   set +e
+  trap - ERR
   docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" down -v --remove-orphans
   docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" down -v --remove-orphans
   docker network rm "$control_network" >/dev/null 2>&1
@@ -34,9 +38,20 @@ cleanup() {
 on_error() {
   code=$?
   echo "Smoke updater-first fallito (exit $code)" >&2
+  echo "Ultimo body ricevuto:" >&2
+  if [[ -n "$last_body" ]]; then printf '%s\n' "$last_body" >&2; else echo "<vuoto>" >&2; fi
+  echo "Bootstrap compose ps:" >&2
+  docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" ps >&2 || true
+  echo "Release compose ps:" >&2
   docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" ps >&2 || true
   docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" logs --no-color migrate backend frontend updater >&2 || true
+  echo "Bootstrap updater logs:" >&2
   docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" logs --no-color updater >&2 || true
+  echo "installation.json:" >&2
+  stat -c '%n uid=%u gid=%g mode=%a size=%s' "$home_dir/state/installation.json" >&2 || true
+  cat "$home_dir/state/installation.json" >&2 || true
+  echo "PID1 UID/GID:" >&2
+  docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" exec -T --user root updater awk '/^(Uid|Gid):/{print $1, $2}' /proc/1/status >&2 || true
   for path in "$home_dir" "$home_dir/state" "$home_dir/secrets" "$home_dir/backups"; do
     stat -c '%n uid=%u gid=%g mode=%a' "$path" >&2 || true
   done
@@ -161,13 +176,48 @@ for secret in postgres_password app_secret setup_token; do
 done
 test -s "$home_dir/state/installation.json"
 job_id="$(printf '%s' "$status" | sed -n 's/.*"jobId":"\([^"]*\)".*/\1/p')"
+completed_at="$(printf '%s' "$status" | sed -n 's/.*"completedAt":"\([^"]*\)".*/\1/p')"
+[[ -n "$job_id" && -n "$completed_at" ]]
 test -s "$home_dir/state/logs/${job_id}.log"
 echo "[post-install] state/log persistence"
 echo "[post-install] restart updater"
-docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/compose.yaml" restart updater || true
-sleep 5
-post_restart_status="$(curl -sS http://127.0.0.1:8081/updater/install/status 2>/dev/null || true)"
+docker compose -p "$project" --env-file "$home_dir/release.env" -f "$home_dir/bootstrap-compose.yaml" restart updater
+healthy=0
+for _ in {1..60}; do
+  if http_code="$(curl -sS --max-time 2 -o "$last_body_file" -w '%{http_code}' http://127.0.0.1:8081/health 2>/dev/null)"; then
+    last_body="$(<"$last_body_file")"
+    if [[ "$http_code" = 200 ]]; then
+      healthy=1
+      break
+    fi
+  fi
+  sleep 2
+done
+if [[ "$healthy" != 1 ]]; then
+  fail "FAIL post-install: updater non tornato healthy dopo restart"
+fi
+
+status_reachable=0
+post_restart_status=""
+for _ in {1..60}; do
+  if http_code="$(curl -sS --max-time 2 -o "$last_body_file" -w '%{http_code}' http://127.0.0.1:8081/updater/install/status 2>/dev/null)"; then
+    last_body="$(<"$last_body_file")"
+    if [[ "$http_code" = 200 ]]; then
+      status_reachable=1
+      post_restart_status="$last_body"
+      grep -q '"status":"completed"' <<<"$post_restart_status" && break
+    fi
+  fi
+  sleep 2
+done
+if [[ "$status_reachable" != 1 ]]; then
+  fail "FAIL post-install: endpoint install/status non raggiungibile dopo restart"
+fi
 if ! grep -q '"status":"completed"' <<<"$post_restart_status"; then
-  echo "FAIL post-install: stato non persistente dopo restart: ${post_restart_status:-<vuoto>}" >&2
-  exit 1
+  fail "FAIL post-install: stato dopo restart diverso da completed"
+fi
+post_restart_job_id="$(printf '%s' "$post_restart_status" | sed -n 's/.*"jobId":"\([^"]*\)".*/\1/p')"
+post_restart_completed_at="$(printf '%s' "$post_restart_status" | sed -n 's/.*"completedAt":"\([^"]*\)".*/\1/p')"
+if [[ "$post_restart_job_id" != "$job_id" || "$post_restart_completed_at" != "$completed_at" ]]; then
+  fail "FAIL post-install: jobId/completedAt cambiati dopo restart"
 fi
