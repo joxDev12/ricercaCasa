@@ -1,5 +1,3 @@
-name: ricercacasa
-
 services:
   database:
     image: postgres:17
@@ -41,6 +39,7 @@ services:
   backend:
     image: ghcr.io/joxdev12/ricercacasa-backend:3.0.0
     restart: unless-stopped
+    ports: ["127.0.0.1:${BACKEND_PORT:-3000}:3000"]
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -87,20 +86,23 @@ services:
       PORT: 8081
       UPDATER_VERSION: 1.0.0
       PLATFORM_VERSION: 3.0.0
-      INSTALLATION_DIR: /installation
+      INSTALLATION_DIR: ${RICERCACASA_HOME:?RICERCACASA_HOME is required}
       APP_PORT: 8080
       APP_PUBLIC_ORIGIN: http://127.0.0.1:8080
       BACKEND_INTERNAL_URL: http://backend:3000
-      RELEASE_MANIFEST_PATH: /installation/manifest.json
-      COMPOSE_FILE_PATH: /installation/compose.yaml
-      RELEASE_ENV_PATH: /installation/release.env
+      RELEASE_MANIFEST_PATH: ${RICERCACASA_HOME:?RICERCACASA_HOME is required}/manifest.json
+      COMPOSE_FILE_PATH: ${RICERCACASA_HOME:?RICERCACASA_HOME is required}/compose.yaml
+      RELEASE_ENV_PATH: ${RICERCACASA_HOME:?RICERCACASA_HOME is required}/release.env
+      ALLOWED_IMAGE_NAMESPACE: ${ALLOWED_IMAGE_NAMESPACE:-ghcr.io/joxdev12}
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-ricercacasa}
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
       SETUP_TOKEN_FILE: /run/secrets/setup_token
     secrets: [setup_token]
     volumes:
       - updater_data:/state
       - backups:/backups
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${RICERCACASA_HOME:-.}:/installation
+      - ${RICERCACASA_HOME:?RICERCACASA_HOME is required}:${RICERCACASA_HOME:?RICERCACASA_HOME is required}
     depends_on:
       backend: {condition: service_healthy}
     networks: [internal]

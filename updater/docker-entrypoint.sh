@@ -20,8 +20,22 @@ read_secret() {
   unset "$file_name"
 }
 
+configure_docker_socket_group() {
+  socket="/var/run/docker.sock"
+  [ -S "$socket" ] || return 0
+
+  socket_gid="$(stat -c '%g' "$socket")"
+  group_name="$(getent group "$socket_gid" | cut -d: -f1 || true)"
+  if [ -z "$group_name" ]; then
+    group_name="dockerhost"
+    groupadd --gid "$socket_gid" "$group_name"
+  fi
+  usermod --append --groups "$group_name" node
+}
+
 if [ "$(id -u)" = "0" ]; then
   read_secret SETUP_TOKEN SETUP_TOKEN_FILE
+  configure_docker_socket_group
   exec gosu node "$@"
 fi
 

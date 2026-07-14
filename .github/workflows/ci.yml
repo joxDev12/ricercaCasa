@@ -79,5 +79,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run install smoke test
         run: |
+          # Legacy development stack smoke; does not verify updater-first installation.
           chmod +x deployment/install.sh deployment/test-install-smoke.sh
           SMOKE_TEST_CONFIRM=1 SMOKE_REQUIRE_SECRET_UID_MISMATCH=1 ./deployment/test-install-smoke.sh
+      - name: Run updater-first local smoke
+        run: |
+          chmod +x deployment/test-updater-first-smoke.sh
+          UPDATER_SMOKE_CONFIRM=1 ./deployment/test-updater-first-smoke.sh

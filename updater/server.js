@@ -27,11 +27,14 @@ function createConfig(env = process.env) {
     installationDir: env.INSTALLATION_DIR || "/installation",
     composeFilePath: env.COMPOSE_FILE_PATH || `${env.INSTALLATION_DIR || "/installation"}/compose.yaml`,
     releaseEnvPath: env.RELEASE_ENV_PATH || `${env.INSTALLATION_DIR || "/installation"}/release.env`,
+    composeProjectName: env.COMPOSE_PROJECT_NAME || "ricercacasa",
+    backendPort: env.BACKEND_PORT || "3000",
     appPublicOrigin:
       env.APP_PUBLIC_ORIGIN || `http://127.0.0.1:${env.APP_PORT || "8080"}`,
     setupToken: readSecret(env.SETUP_TOKEN, env.SETUP_TOKEN_FILE),
     updaterVersion: env.UPDATER_VERSION || "1.0.0",
     platformVersion: env.PLATFORM_VERSION || "3.0.0",
+    allowedImageNamespace: env.ALLOWED_IMAGE_NAMESPACE || "ghcr.io/joxdev12",
   };
 }
 
@@ -195,7 +198,7 @@ function getLatestManifest(config) {
 
   try {
     return {
-      data: validateManifest(JSON.parse(fs.readFileSync(config.releaseManifestPath, "utf8"))),
+      data: validateManifest(JSON.parse(fs.readFileSync(config.releaseManifestPath, "utf8")), config.allowedImageNamespace),
       statusCode: 200,
     };
   } catch (_error) {

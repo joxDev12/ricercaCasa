@@ -11,7 +11,12 @@ function createInstallService({ config, store, docker }) {
 
 async function execute(job) {
     try {
-      validateManifest(JSON.parse(fs.readFileSync(config.releaseManifestPath, "utf8")));
+      if (!docker.info || !docker.composeVersion) {
+        throw Object.assign(new Error("Docker client non configurato"), { code: "DOCKER_CLIENT_NOT_CONFIGURED" });
+      }
+      await docker.info({ onLine: (line) => store.appendLog(job.jobId, line) });
+      await docker.composeVersion({ onLine: (line) => store.appendLog(job.jobId, line) });
+      validateManifest(JSON.parse(fs.readFileSync(config.releaseManifestPath, "utf8")), config.allowedImageNamespace);
       for (const phase of phases) {
         job.phase = phase;
         job.updatedAt = new Date().toISOString();

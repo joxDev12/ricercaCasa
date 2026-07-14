@@ -23,7 +23,7 @@ test("install service persists phases and runs allowlisted compose actions", asy
   const service = createInstallService({
     config: { installationDir: dir, releaseManifestPath: path.join(dir, "manifest.json"), platformVersion: "3.0.0" },
     store: createJobStore(dir),
-    docker: { compose: async (args) => commands.push(args) },
+    docker: { info: async () => {}, composeVersion: async () => {}, compose: async (args) => commands.push(args) },
   });
   try {
     const job = service.start();
