@@ -1,371 +1,186 @@
 # RicercaCasa
 
-RicercaCasa è un'applicazione web **single-user, local-first e self-hosted** per cercare annunci immobiliari su più portali italiani, confrontare fonti differenti e organizzare localmente gli immobili di interesse.
+**RicercaCasa** è un'applicazione web **local-first, single-user e self-hosted** per cercare annunci immobiliari su più portali, confrontare fonti differenti e organizzare in un unico posto gli immobili di interesse.
 
-L'applicazione non vuole sostituire i portali immobiliari. Fornisce un unico ambiente personale per:
+La piattaforma gira interamente tramite Docker sul computer dell'utente. Dati, preferiti, note e configurazioni restano nel database locale.
 
-- cercare immobili in affitto o vendita;
-- interrogare più provider;
-- ridurre i risultati duplicati;
-- salvare gli annunci nel proprio database;
+> **Release corrente:** `v3.0.0`  
+> **Stato:** prima release pubblica installabile tramite updater guidato
+
+---
+
+## Perché RicercaCasa
+
+Cercare casa significa spesso ripetere le stesse ricerche su portali diversi, aprire molti annunci duplicati e perdere informazioni quando una pagina viene modificata o rimossa.
+
+RicercaCasa offre un ambiente personale per:
+
+- interrogare più provider da una sola interfaccia;
+- normalizzare risultati con strutture differenti;
+- ridurre annunci duplicati;
+- salvare localmente gli immobili interessanti;
 - collegare più annunci allo stesso immobile;
 - aggiungere note e appuntamenti;
 - gestire lo stato della ricerca;
-- conservare i dati utili anche quando la pagina originale cambia o viene rimossa.
+- conservare dati utili anche quando la fonte originale cambia.
 
-> Gli scraper dipendono dalla struttura e dalla disponibilità dei portali esterni. Possono richiedere manutenzione quando un provider cambia HTML, URL, protezioni o modalità di accesso.
-
----
-
-## Stato del progetto
-
-| Versione | Stato | Obiettivo principale |
-|---|---|---|
-| **V1** | Completata | Fondazione full stack, Immobiliare.it, preferiti, PostgreSQL e migrazioni |
-| **V2** | Sviluppo avanzato | Idealista, Casa.it, ricerca multi-provider, deduplicazione, note e appuntamenti |
-| **V3** | Pianificata | Docker Compose, installer guidato, impostazioni e aggiornamenti dalla dashboard |
-| **V4** | Futura | Valutazione integrazione WikiCasa e Subito.it |
-
-La V3 è dedicata alla distribuzione e all'affidabilità. **WikiCasa e Subito.it non fanno parte della V3.**
-
----
-
-## Anteprime
-
-### Home
-
-![Mockup della home di RicercaCasa](docs/Mockups/v1/Home_v1.png)
-
-### Pagina dettaglio
-
-![Mockup della pagina dettaglio di RicercaCasa](docs/Mockups/v2/Dettaglio_v1.svg)
-
----
-
-## Funzionalità disponibili nella V2
+## Funzionalità principali
 
 ### Ricerca multi-provider
 
-Provider integrati:
+Provider attualmente integrati:
 
 - Immobiliare.it;
 - Idealista;
 - Casa.it.
 
-Criteri principali:
-
-- zona;
-- affitto o vendita;
-- prezzo massimo;
-- provider da interrogare;
-- paginazione quando supportata.
-
-Le ricerche dei provider sono indipendenti. Se una fonte fallisce ma le altre rispondono, il backend restituisce i risultati disponibili insieme a un avviso non bloccante.
+Ogni provider viene interrogato in modo indipendente. Se una fonte non risponde, gli altri risultati possono comunque essere mostrati con un avviso non bloccante.
 
 ### Normalizzazione e deduplicazione
 
-Ogni scraper converte i dati del proprio portale in un modello comune.
+Gli scraper convertono i dati dei portali in un modello comune. Il sistema confronta elementi come:
 
-La deduplicazione distingue:
-
-1. duplicati esatti della stessa fonte;
-2. annunci provenienti da portali diversi che potrebbero riferirsi allo stesso immobile.
-
-I confronti utilizzano segnali come:
-
-- comune e zona;
-- indirizzo e numero civico;
-- superficie;
-- locali;
-- tipologia;
-- piano;
+- posizione e indirizzo;
 - prezzo;
-- titolo e descrizione;
+- superficie e numero di locali;
+- tipologia e piano;
+- descrizione;
 - inserzionista;
 - immagini normalizzate.
 
-Ogni gruppo logico può contenere al massimo un annuncio per provider. Le fonti originali restano comunque separate e consultabili.
+Le fonti originali restano separate e consultabili anche quando vengono associate allo stesso immobile logico.
 
-### Salvataggio locale
+### Gestione personale degli immobili
 
-Gli annunci vengono salvati soltanto quando l'utente seleziona **Salva**.
-
-Il database conserva, quando disponibili:
-
-- titolo e descrizione;
-- prezzo e tipo di operazione;
-- superficie, locali e piano;
-- posizione;
-- inserzionista;
-- immagini;
-- URL e identificativo della fonte;
-- dati normalizzati usati nella deduplicazione;
-- date di acquisizione e aggiornamento.
-
-### Gestione dell'immobile
-
-Ogni immobile logico può avere:
+Ogni immobile salvato può contenere:
 
 - più fonti collegate;
-- stato gestionale;
+- stato della ricerca;
 - note personali;
 - appuntamenti;
-- candidati duplicati da confermare o rifiutare.
+- candidati duplicati da verificare.
 
-Gli stati previsti comprendono:
+Stati disponibili:
 
-- salvato;
-- da contattare;
-- contattato;
-- appuntamento programmato;
-- visitato;
-- scartato.
+```text
+salvato
+→ da contattare
+→ contattato
+→ appuntamento programmato
+→ visitato
+→ scartato
+```
 
-I dati personali non vengono sovrascritti da un nuovo scraping.
+I dati personali non vengono sovrascritti da una nuova acquisizione.
 
 ---
 
-# V3 — Distribuzione self-hosted semplificata
+## Installazione rapida
 
-La V3 renderà RicercaCasa installabile da utenti non tecnici tramite Docker.
-
-## Architettura prevista
-
-```text
-frontend
-backend
-database PostgreSQL
-updater + wizard
-```
-
-Frontend e backend appartengono alla stessa release applicativa. L'updater possiede invece una versione indipendente, perché può essere aggiornato prima del resto della piattaforma.
-
-Esempio:
-
-```text
-RicercaCasa 3.1.0
-├── frontend 3.1.0
-├── backend 3.1.0
-├── updater 1.2.0
-└── PostgreSQL 17
-```
-
-## Installazione guidata
-
-L'utente non dovrà:
-
-- installare Node.js;
-- installare PostgreSQL;
-- creare manualmente database e utente;
-- scegliere una password PostgreSQL;
-- modificare file Compose tecnici.
-
-L'installer genererà automaticamente i secret e aprirà un wizard locale.
-
-Il wizard V3 richiederà soltanto impostazioni comprensibili:
-
-- nome visualizzato;
-- email di contatto;
-- lingua;
-- fuso orario;
-- conferma delle condizioni d'uso locale degli scraper.
-
-## Pagina impostazioni
-
-Dopo l'installazione l'utente potrà modificare:
-
-- nome;
-- email;
-- lingua;
-- fuso orario;
-- configurazioni delle funzionalità future.
-
-La pagina mostrerà anche:
-
-- versione installata;
-- versione updater;
-- stato servizi;
-- ultimo aggiornamento;
-- disponibilità di nuove versioni.
-
-Le credenziali del database non verranno mostrate perché vengono gestite automaticamente.
-
-## Aggiornamenti dalla dashboard
-
-Quando è disponibile una nuova release, la dashboard mostrerà:
-
-- versione attuale;
-- versione disponibile;
-- note di rilascio;
-- eventuale migrazione database;
-- eventuale nuova configurazione richiesta;
-- pulsante **Aggiorna**.
-
-L'updater coordinerà:
-
-1. verifica del release manifest;
-2. controllo compatibilità e spazio disponibile;
-3. aggiornamento di sé stesso, quando richiesto;
-4. ripresa automatica del job dopo il proprio riavvio;
-5. download del frontend e backend della stessa release;
-6. backup PostgreSQL;
-7. migrazioni;
-8. riavvio backend e frontend;
-9. healthcheck;
-10. rollback applicativo in caso di errore.
-
-Il backend non avrà accesso al Docker socket. Il controllo dei container resterà confinato nell'updater.
-
-## Wizard dopo gli aggiornamenti
-
-Una futura feature può dichiarare una configurazione necessaria.
-
-Esempio futuro:
-
-```text
-RicercaCasa aggiornata
-Nuova funzione: invio email
-[Configura ora]
-```
-
-L'updater presenta il wizard, mentre il backend:
-
-- definisce i campi;
-- valida i valori;
-- salva le impostazioni;
-- abilita la feature.
-
-I task possono essere:
-
-- bloccanti, se la piattaforma non può funzionare correttamente senza configurazione;
-- non bloccanti, se la feature può restare spenta finché non viene configurata.
-
----
-
-## Setup locale V3 da Docker
-
-Stato attuale repository:
-
-- backend con health `live` e `ready`;
-- tabelle V3 per installazione, preferenze, feature e storico update;
-- pagina `Impostazioni` nel frontend;
-- updater locale minimale con wizard iniziale;
-- `Dockerfile` per backend, frontend, updater;
-- `compose.yaml` e `install.sh` per prova locale;
-- workflow CI con test, build, migrazioni e build immagini.
-
-### Prerequisiti
+### Requisiti
 
 - Docker Engine oppure Docker Desktop;
-- Docker Compose v2.
+- Docker Compose v2;
+- Linux, macOS o Windows con ambiente Docker compatibile.
 
-### Avvio stack locale
-
-Dal repository:
+### Installa la release pubblica
 
 ```bash
-chmod +x deployment/install.sh
-./deployment/install.sh
+curl -fsSL https://github.com/joxDev12/ricercaCasa/releases/download/v3.0.0/install.sh | sh
 ```
 
-URL locali:
+L'installer:
 
-- dashboard: `http://127.0.0.1:8080/`
-- wizard/updater: `http://127.0.0.1:8081/`
+1. crea `~/.ricercacasa`;
+2. scarica e verifica gli asset della release;
+3. genera automaticamente i secret con permessi `600`;
+4. avvia soltanto l'updater;
+5. lascia all'updater la gestione della prima installazione.
 
-L'installer locale:
-
-- genera `deployment/secrets/postgres_password`;
-- genera `deployment/secrets/app_secret`;
-- genera `deployment/secrets/setup_token`;
-- crea `deployment/release.env` se assente;
-- builda immagini locali e avvia stack.
-
-### Wizard iniziale
-
-Wizard vive in updater e inoltra richieste a backend interno con token bootstrap.
-
-Campi attuali:
-
-- nome visualizzato;
-- email contatto;
-- lingua;
-- fuso orario;
-- consenso uso locale scraper;
-- conferma finale setup.
-
-Dopo completamento:
-
-- backend marca `app_installation.setup_status = completed`;
-- API bootstrap non completano più setup seconda volta;
-- dashboard `Impostazioni` mostra stato installazione e versioni.
-
-### Simulare disponibilita update
-
-Updater minimale legge manifest locale da:
+Apri quindi:
 
 ```text
-deployment/state/manifests/latest.json
+Updater e configurazione: http://127.0.0.1:8081
+Applicazione:             http://127.0.0.1:8080
 ```
 
-Per prova rapida:
+Dalla schermata updater vengono avviati automaticamente:
 
-```bash
-mkdir -p deployment/state/manifests
-cp deployment/manifest.example.json deployment/state/manifests/latest.json
-```
+- PostgreSQL;
+- migrazioni database;
+- backend;
+- frontend;
+- controlli di readiness;
+- wizard iniziale.
 
-Endpoint utile:
+Non è necessario installare Node.js, PostgreSQL o dipendenze del progetto sul sistema host.
+
+---
+
+## Architettura
 
 ```text
-GET http://127.0.0.1:8081/updater/releases/latest
+Browser
+   │
+   ├── http://127.0.0.1:8080
+   │        Frontend React
+   │              │
+   │        Backend Express
+   │              │
+   │         PostgreSQL 17
+   │
+   └── http://127.0.0.1:8081
+            Updater / Wizard
+                  │
+             Docker Engine
 ```
 
-Questa base serve per prossima fase: provare esperienza utente di update e iterare wizard/update flow dopo primo deploy.
+Componenti principali:
 
-### Comandi utili
+| Componente | Responsabilità |
+|---|---|
+| Frontend | Interfaccia, ricerca, preferiti, note, appuntamenti e impostazioni |
+| Backend | API, scraping, normalizzazione, deduplicazione e logica applicativa |
+| PostgreSQL | Persistenza locale dei dati |
+| Updater | Bootstrap, installazione, migrazioni, healthcheck e gestione release |
 
-```bash
-docker compose -f deployment/compose.yaml --env-file deployment/release.env ps
-docker compose -f deployment/compose.yaml --env-file deployment/release.env logs -f updater
-docker compose -f deployment/compose.yaml --env-file deployment/release.env logs -f backend
-docker compose -f deployment/compose.yaml --env-file deployment/release.env down
-```
+Frontend e backend condividono la versione della piattaforma. L'updater mantiene una versione indipendente per poter evolvere separatamente dal resto dello stack.
 
-### Stato updater attuale
+## Distribuzione e affidabilità
 
-Installazione pubblica senza repository (asset GitHub Release):
+La release pubblica usa:
 
-```bash
-curl -fsSL https://github.com/joxDev12/ricercaCasa/releases/download/v3.0.0/install.sh | bash
-```
+- immagini Docker pubblicate su GitHub Container Registry;
+- tag di versione SemVer;
+- riferimenti immagine tramite digest SHA256 nel manifest;
+- checksum SHA256 degli asset scaricati;
+- Compose pubblico senza istruzioni `build:`;
+- migrazioni eseguite come servizio one-shot;
+- healthcheck e readiness prima di dichiarare completata l'installazione;
+- CI con test backend, frontend, updater e smoke test Docker;
+- smoke test finale eseguito sugli asset reali della release.
 
-Bootstrap crea `~/.ricercacasa`, genera secret `600` e avvia soltanto updater. Updater scarica immagini, esegue migrazioni e avvia stack applicativo.
+Il backend non accede al Docker socket. Il controllo Docker è confinato nell'updater, che espone soltanto operazioni applicative predefinite.
 
-Updater presente oggi copre:
-
-- pagina wizard iniziale;
-- proxy bootstrap verso backend con `x-setup-token`;
-- endpoint stato locale;
-- lettura manifest locale per simulazioni update.
-
-Non copre ancora:
-
-- pull digest remoto;
-- backup automatico PostgreSQL;
-- state machine completa update;
-- self-update updater;
-- rollback coordinato.
+> L'accesso al Docker socket concede privilegi elevati sull'host. RicercaCasa limita questa capacità al container updater e non espone comandi shell arbitrari dalla dashboard.
 
 ---
 
 ## Stack tecnologico
 
+### Frontend
+
+- React 19;
+- TypeScript;
+- Vite;
+- React Router;
+- Tailwind CSS;
+- Fetch API.
+
 ### Backend
 
 - Node.js;
 - Express 5;
-- JavaScript CommonJS;
 - PostgreSQL;
 - `pg`;
 - `node-pg-migrate`;
@@ -375,230 +190,152 @@ Non copre ancora:
 - rate limiting;
 - test runner nativo Node.js.
 
-### Frontend
-
-- React 19;
-- TypeScript;
-- Vite;
-- React Router;
-- Tailwind CSS;
-- Context API;
-- custom hook;
-- Fetch API.
-
-### Distribuzione V3
+### Infrastruttura
 
 - Docker;
 - Docker Compose v2;
+- PostgreSQL 17;
 - GitHub Actions;
 - GitHub Container Registry;
-- immagini versionate tramite SemVer e digest;
-- release manifest;
-- backup PostgreSQL;
-- healthcheck e rollback.
+- release manifest e checksum SHA256.
 
 ---
 
-## Struttura attuale del repository
+## Stato del progetto
+
+| Area | Stato |
+|---|---|
+| Ricerca multi-provider | Disponibile |
+| Normalizzazione e deduplicazione | Disponibile |
+| Salvataggio locale | Disponibile |
+| Note e appuntamenti | Disponibile |
+| Impostazioni e wizard iniziale | Disponibile |
+| Installazione updater-first | Disponibile in `v3.0.0` |
+| Immagini GHCR e release pubblica | Disponibile |
+| Aggiornamento automatico tra versioni | In sviluppo |
+| Backup automatico prima degli update | Pianificato |
+| Rollback coordinato | Pianificato |
+| Monitor compatibilità provider | Pianificato |
+
+## Prossimi passi
+
+### 1. Motore di aggiornamento `3.0.0 → 3.0.1`
+
+Il prossimo obiettivo è rendere operativo l'aggiornamento dalla dashboard con una state machine persistente:
 
 ```text
-ricercaCasa/
-├── backend/
-│   ├── config/
-│   ├── controller/
-│   ├── middleware/
-│   ├── migrations/
-│   ├── models/
-│   ├── routes/
-│   ├── scraper/
-│   ├── services/
-│   ├── tests/
-│   ├── utils/
-│   ├── validators/
-│   ├── app.js
-│   ├── server.js
-│   └── package.json
-├── docs/
-│   ├── AD/
-│   ├── AF/
-│   ├── Mockups/
-│   └── V3/
-├── ricercaCasa/
-│   ├── public/
-│   ├── src/
-│   ├── package.json
-│   └── vite.config.ts
-└── README.md
+verifica manifest
+→ controllo compatibilità
+→ backup PostgreSQL
+→ download immagini
+→ migrazioni
+→ riavvio coordinato
+→ healthcheck
+→ completamento o rollback
 ```
 
-Struttura prevista durante la V3:
+Il job dovrà poter riprendere anche dopo il riavvio dell'updater.
+
+### 2. Backup e rollback
+
+Prima delle release che modificano il database verranno introdotti:
+
+- backup PostgreSQL automatico;
+- storico degli aggiornamenti;
+- ripristino delle immagini precedenti;
+- messaggi di errore e log consultabili dalla dashboard.
+
+### 3. Monitor compatibilità provider
+
+I provider esterni possono cambiare HTML, endpoint o protezioni senza preavviso. È prevista una funzione che distingua tra:
 
 ```text
-├── updater/
-├── deployment/
-└── .github/workflows/
+operativo
+in stato degradato
+temporaneamente non raggiungibile
+incompatibile con la versione installata
+disabilitato fino a un aggiornamento
 ```
+
+Questo eviterà risultati vuoti o dati errati senza spiegazioni.
+
+### 4. Evoluzione della ricerca
+
+Interventi futuri:
+
+- miglioramento della qualità di deduplicazione;
+- gestione più avanzata delle immagini;
+- filtri aggiuntivi;
+- valutazione di nuovi provider;
+- notifiche opzionali e automazioni locali.
 
 ---
 
-# Installazione attuale per sviluppo
+## Sviluppo locale
 
-Fino al completamento della V3, l'avvio resta manuale.
-
-## Requisiti
-
-- Git;
-- Node.js LTS recente;
-- npm;
-- PostgreSQL.
-
-## Clone
+Clona il repository:
 
 ```bash
 git clone https://github.com/joxDev12/ricercaCasa.git
 cd ricercaCasa
 ```
 
-## Backend
-
-```bash
-cd backend
-npm install
-cp .env.example .env
-npm run db:migrate
-npm run dev
-```
-
-Su PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Configurazione di sviluppo indicativa:
-
-```env
-FRONTEND_ORIGIN=http://localhost:5173
-PORT=3000
-SCRAPE_TIMEOUT_MS=10000
-ALLOW_PROVIDER_SCRAPING=true
-DATABASE_URL=postgres://utente:password@localhost:5432/ricerca_casa
-NODE_ENV=development
-```
-
-Health endpoint attuale:
+La struttura principale è:
 
 ```text
-http://localhost:3000/health
+ricercaCasa/
+├── backend/          API, scraper, servizi e migrazioni
+├── ricercaCasa/      frontend React e TypeScript
+├── updater/          installer, wizard e orchestrazione Docker
+├── deployment/       Compose, manifest, installer e smoke test
+├── docs/             documentazione tecnica e mockup
+└── .github/workflows CI e pipeline release
 ```
 
-## Frontend
-
-Da un secondo terminale:
+Test principali:
 
 ```bash
-cd ricercaCasa
-npm install
-cp .env.example .env
-npm run dev
+cd backend && npm test
+cd ../ricercaCasa && npm run lint && npm run build
+cd .. && node --test updater/tests/*.test.js
 ```
 
-Aprire:
+La pipeline CI verifica anche migrazioni, build delle immagini e installazione updater-first in un ambiente Docker pulito.
+
+---
+
+## Anteprime
+
+### Home
+
+![Mockup della home di RicercaCasa](docs/Mockups/v1/Home_v1.png)
+
+### Dettaglio immobile
+
+![Mockup della pagina dettaglio di RicercaCasa](docs/Mockups/v2/Dettaglio_v1.svg)
+
+---
+
+## Nota sui provider
+
+RicercaCasa non è affiliato ai portali immobiliari interrogati e non intende sostituirli.
+
+Gli scraper dipendono dalla struttura e dalla disponibilità dei siti esterni. Un provider può richiedere manutenzione quando cambia HTML, URL, API interne, protezioni anti-bot o modalità di accesso. L'utilizzo deve rispettare termini di servizio, limiti tecnici e normativa applicabile.
+
+## Release
+
+La prima release pubblica è disponibile nella sezione **Releases** del repository:
 
 ```text
-http://localhost:5173
+v3.0.0 — updater-first public release
 ```
 
-Durante lo sviluppo `VITE_API_BASE_URL` può rimanere vuoto perché Vite inoltra `/api` e `/health` al backend locale.
+Asset pubblicati:
 
----
-
-## Comandi utili
-
-### Backend
-
-```bash
-npm run dev
-npm start
-npm test
-npm run db:migrate
-npm run db:rollback
-npm run db:status
-npm run db:create-migration -- nome_migrazione
-```
-
-### Frontend
-
-```bash
-npm run dev
-npm run lint
-npm run build
-npm run preview
-```
-
----
-
-## Documentazione tecnica
-
-### Analisi funzionali
-
-- [Analisi Funzionale V1](docs/AF/v1-analisi-funzionale.md)
-- [Analisi Funzionale V2](docs/AF/v2-analisi-funzionale.md)
-- [Analisi Funzionale V3](docs/AF/v3-analisi-funzionale.md)
-
-### Analisi database
-
-- [Analisi Database V1](docs/AD/v1-analisi-database.md)
-- [Analisi Database V2](docs/AD/v2-analisi-database.md)
-- [Analisi Database V3](docs/AD/v3-analisi-database.md)
-
-### Piano tecnico V3
-
-- [Checklist bugfix e pre-deploy](docs/V3/v3-checklist-pre-deploy.md)
-- [Architettura Wizard, Updater, Docker Compose e GitHub Actions](docs/V3/v3-architettura-wizard-updater-docker.md)
-
----
-
-## Principi del progetto
-
-- route, controller, service e repository restano separati;
-- gli scraper non contengono logica Express o SQL;
-- i repository non contengono DDL;
-- lo schema cambia soltanto tramite migrazioni;
-- i dati personali non vengono sovrascritti dallo scraping;
-- i match cross-provider restano prudenti e verificabili;
-- frontend e backend vengono aggiornati come un'unica release;
-- il backend non controlla Docker;
-- i secret restano fuori dal repository e dalle API;
-- database e backend non vengono esposti sull'host nell'installazione V3 predefinita;
-- nessuna release stabile viene pubblicata senza test, backup verificato e healthcheck.
-
----
-
-## Limitazioni attuali
-
-- applicazione single-user;
-- nessuna autenticazione per accesso remoto;
-- utilizzo principalmente locale;
-- nessuna email o notifica push;
-- nessuna ricerca pianificata automatica;
-- scraper dipendenti dai portali esterni;
-- Docker e updater non ancora implementati;
-- WikiCasa e Subito.it rinviati alla V4.
-
----
-
-## Roadmap immediata V3
-
-1. chiusura bugfix pre-deploy;
-2. pipeline CI;
-3. impostazioni e wizard backend/frontend;
-4. Dockerfile production;
-5. Compose a quattro container;
-6. updater base;
-7. backup e rollback;
-8. self-update updater;
-9. wizard post-update;
-10. installer Linux e Windows;
-11. pubblicazione GHCR;
-12. release candidate V3.
+- `install.sh`;
+- `bootstrap-compose.yaml`;
+- `compose.yaml`;
+- `release.env.example`;
+- `manifest.json`;
+- `manifest.schema.json`;
+- `checksums.txt`.
