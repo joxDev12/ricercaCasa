@@ -81,19 +81,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
+          set -euo pipefail
           mkdir release-assets
           cp deployment/install.release.sh deployment/bootstrap-compose.yaml deployment/compose.release.yaml deployment/release.env.example deployment/manifest.schema.json release-assets/
           mv release-assets/install.release.sh release-assets/install.sh
           mv release-assets/compose.release.yaml release-assets/compose.yaml
+
           backend_digest='${{ needs.publish.outputs.backend_digest }}'; backend_digest="${backend_digest#sha256:}"
           frontend_digest='${{ needs.publish.outputs.frontend_digest }}'; frontend_digest="${frontend_digest#sha256:}"
           updater_digest='${{ needs.publish.outputs.updater_digest }}'; updater_digest="${updater_digest#sha256:}"
+          compose_sha256="$(sha256sum release-assets/compose.yaml | awk '{print $1}')"
+          release_env_sha256="$(sha256sum release-assets/release.env.example | awk '{print $1}')"
+
           sed -e 's/__RELEASED_AT__/'"$(date -u +%FT%TZ)"'/' \
             -e "s/__BACKEND_DIGEST__/$backend_digest/" \
             -e "s/__FRONTEND_DIGEST__/$frontend_digest/" \
             -e "s/__UPDATER_DIGEST__/$updater_digest/" \
+            -e "s/__COMPOSE_SHA256__/$compose_sha256/" \
+            -e "s/__RELEASE_ENV_SHA256__/$release_env_sha256/" \
             deployment/manifest.release.template.json > release-assets/manifest.json
+
+          if grep -Eq '__[A-Z0-9_]+__' release-assets/manifest.json; then
+            echo "Manifest contiene placeholder non sostituiti" >&2
+            cat release-assets/manifest.json >&2
+            exit 1
+          fi
+
+          node -e "const fs=require('fs'); const {validateManifest}=require('./updater/manifestService'); validateManifest(JSON.parse(fs.readFileSync('release-assets/manifest.json','utf8')), 'ghcr.io/joxdev12');"
           (cd release-assets && sha256sum install.sh bootstrap-compose.yaml compose.yaml release.env.example manifest.json manifest.schema.json > checksums.txt)
+          (cd release-assets && sha256sum -c checksums.txt)
       - uses: actions/upload-artifact@v4
         with:
           name: release-assets
